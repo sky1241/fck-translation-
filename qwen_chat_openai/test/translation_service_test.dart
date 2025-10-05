@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -13,6 +14,10 @@ class _FakeClient extends AppHttpClient {
   @override
   Future<http.Response> postJson(Uri url,
       {required Map<String, Object?> body, Map<String, String>? headers}) async {
+    // Mimic AppHttpClient behavior: throw on non-2xx
+    if (_res.statusCode < 200 || _res.statusCode >= 300) {
+      throw StateError('HTTP ${_res.statusCode}: ${_res.body}');
+    }
     return _res;
   }
 }
@@ -31,8 +36,13 @@ void main() {
         }
       ]
     });
+    final Uint8List bytes = Uint8List.fromList(utf8.encode(payload));
     final svc = TranslationService(
-      client: _FakeClient(http.Response(payload, 200)),
+      client: _FakeClient(
+        http.Response.bytes(bytes, 200, headers: {
+          'content-type': 'application/json; charset=utf-8',
+        }),
+      ),
       baseUrl: 'https://api.openai.com/v1/chat/completions',
       apiKey: 'sk-test',
       model: 'gpt-4o-mini',
@@ -51,7 +61,7 @@ void main() {
   });
 
   test('handles noisy JSON response by extracting first {...}', () async {
-    final noisy = 'xxx {"translation":"salut","pinyin":null,"notes":null} yyy';
+    const noisy = 'xxx {"translation":"salut","pinyin":null,"notes":null} yyy';
     final payload = jsonEncode({
       'choices': [
         {
@@ -59,8 +69,13 @@ void main() {
         }
       ]
     });
+    final Uint8List bytes = Uint8List.fromList(utf8.encode(payload));
     final svc = TranslationService(
-      client: _FakeClient(http.Response(payload, 200)),
+      client: _FakeClient(
+        http.Response.bytes(bytes, 200, headers: {
+          'content-type': 'application/json; charset=utf-8',
+        }),
+      ),
       baseUrl: 'https://api.openai.com/v1/chat/completions',
       apiKey: 'sk-test',
       model: 'gpt-4o-mini',
