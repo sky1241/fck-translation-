@@ -1,16 +1,32 @@
 # qwen_chat_openai
 
-A new Flutter project.
+Chat FR ↔ ZH (zh-Hans) basé sur OpenAI Chat Completions (ChatGPT), UI type WhatsApp.
 
-## Getting Started
+## Configuration
 
-This project is a starting point for a Flutter application.
+Ne commitez aucun secret. Utilisez `--dart-define`:
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+flutter pub get
+flutter run \
+  --dart-define=OPENAI_BASE_URL=https://api.openai.com/v1/chat/completions \
+  --dart-define=OPENAI_API_KEY=sk-XXXX \
+  --dart-define=OPENAI_MODEL=gpt-4o-mini
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Build APK (test direct sur téléphone)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter build apk --release \
+  --dart-define=OPENAI_BASE_URL=https://api.openai.com/v1/chat/completions \
+  --dart-define=OPENAI_API_KEY=sk-XXXX \
+  --dart-define=OPENAI_MODEL=gpt-4o-mini
+```
+
+## Fonctionnalités
+
+- Traduction FR ⇄ ZH (zh-Hans) directionnelle avec ton (casual/affectionate/business)
+- JSON strict côté sortie, fallback extraction {...}
+- Persistance locale des messages (`shared_preferences`)
+- UI type WhatsApp (texte, pinyin optionnel côté ZH)
+

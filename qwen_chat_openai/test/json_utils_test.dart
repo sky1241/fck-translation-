@@ -15,7 +15,7 @@ void main() {
 
   group('extractFirstJson', () {
     test('extracts first JSON object', () {
-      final s = 'noise {"x":true} trailing';
+      const s = 'noise {"x":true} trailing';
       expect(extractFirstJson(s), '{"x":true}');
     });
 
