@@ -8,7 +8,8 @@ plugins {
 android {
     namespace = "com.example.qwen_chat_openai"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Pin highest required NDK to avoid plugin mismatch warnings
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
