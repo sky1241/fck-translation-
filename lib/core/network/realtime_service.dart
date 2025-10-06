@@ -8,7 +8,7 @@ class RealtimeService {
   RealtimeService({WebSocketChannel? channel}) : _channel = channel;
 
   WebSocketChannel? _channel;
-  StreamSubscription? _sub;
+  StreamSubscription<dynamic>? _sub;
 
   final StreamController<Map<String, dynamic>> _incomingCtrl =
       StreamController<Map<String, dynamic>>.broadcast();
