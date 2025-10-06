@@ -8,6 +8,7 @@ class MessageBubble extends StatelessWidget {
     required this.translation,
     this.pinyin,
     this.notes,
+    this.time,
   });
 
   final bool isMe;
@@ -15,6 +16,7 @@ class MessageBubble extends StatelessWidget {
   final String translation;
   final String? pinyin;
   final String? notes;
+  final DateTime? time;
 
   @override
   Widget build(BuildContext context) {
@@ -39,36 +41,54 @@ class MessageBubble extends StatelessWidget {
           crossAxisAlignment: cross,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Text(
-              original,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(fontStyle: FontStyle.italic),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              translation,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            if (pinyin != null && pinyin!.isNotEmpty) ...<Widget>[
+            if (isMe) ...<Widget>[
+              Text(
+                original,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(fontStyle: FontStyle.italic),
+              ),
+            ] else ...<Widget>[
+              Text(
+                translation,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+            if (!isMe && pinyin != null && pinyin!.isNotEmpty) ...<Widget>[
               const SizedBox(height: 4),
               Text(
                 pinyin!,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
-            if (notes != null && notes!.isNotEmpty) ...<Widget>[
+            if (!isMe && notes != null && notes!.isNotEmpty) ...<Widget>[
               const SizedBox(height: 4),
               Text(
                 notes!,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
+            if (time != null) ...<Widget>[
+              const SizedBox(height: 6),
+              Text(
+                _formatTime(time!),
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: Colors.black54),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  static String _formatTime(DateTime t) {
+    final String hh = t.hour.toString().padLeft(2, '0');
+    final String mm = t.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
   }
 }
 

@@ -14,6 +14,7 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _textCtrl = TextEditingController();
+  final ScrollController _listCtrl = ScrollController();
 
   @override
   void initState() {
@@ -61,43 +62,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ),
               ],
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: Row(
-              children: <Widget>[
-                DropdownButton<String>(
-                  value: controller.tone,
-                  items: const <DropdownMenuItem<String>>[
-                    DropdownMenuItem(value: 'casual', child: Text('Casual')),
-                    DropdownMenuItem(
-                        value: 'affectionate', child: Text('Affectionate')),
-                    DropdownMenuItem(
-                        value: 'business', child: Text('Business')),
-                  ],
-                  onChanged: (String? v) {
-                    if (v != null) {
-                      ref.read(chatControllerProvider.notifier).setTone(v);
-                    }
-                  },
-                ),
-                const SizedBox(width: 12),
-                if (controller.targetLang == 'zh')
-                  Row(
-                    children: <Widget>[
-                      const Text('Pinyin'),
-                      Switch(
-                        value: controller.wantPinyin,
-                        onChanged: (_) => ref
-                            .read(chatControllerProvider.notifier)
-                            .togglePinyin(),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 8),
           Expanded(
             child: ListView.builder(
+              controller: _listCtrl,
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: messages.length,
               itemBuilder: (BuildContext context, int index) {
@@ -108,13 +76,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   translation: m.translatedText,
                   pinyin: m.pinyin,
                   notes: m.notes,
+                  time: m.time,
                 );
               },
             ),
           ),
           ComposerBar(
             controller: _textCtrl,
-            enabled: !controller.isSending,
+            enabled: true,
             hintText: controller.sourceLang == 'fr'
                 ? 'Écrire en français…'
                 : '用中文输入…',
@@ -122,6 +91,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               final text = _textCtrl.text;
               _textCtrl.clear();
               await ref.read(chatControllerProvider.notifier).send(text);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (_listCtrl.hasClients) {
+                  _listCtrl.animateTo(
+                    _listCtrl.position.maxScrollExtent,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  );
+                }
+              });
             },
           ),
         ],

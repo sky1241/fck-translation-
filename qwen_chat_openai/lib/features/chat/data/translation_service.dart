@@ -43,6 +43,19 @@ class TranslationService {
     required String tone,
     required bool wantPinyin,
   }) async {
+    // MOCK: bypass network if enabled
+    if (AppEnv.mockMode) {
+      final String mockTranslation =
+          targetLang == 'zh' ? '【MOCK ZH】$text' : '【MOCK FR】$text';
+      final String? mockPinyin =
+          (targetLang == 'zh' && wantPinyin) ? 'mo ke yin (mock pinyin)' : null;
+      return TranslationResult(
+        translation: mockTranslation,
+        pinyin: mockPinyin,
+        notes: null,
+      );
+    }
+
     if (_baseUrl.isEmpty || _apiKey.isEmpty) {
       AppEnv.assertConfigured();
     }
@@ -84,53 +97,80 @@ class TranslationService {
       },
     };
 
-    final Map<String, Object?> body = <String, Object?>{
-      'model': _model,
-      'temperature': 0.2,
-      'max_tokens': 300,
-      // If supported, ask for strict JSON.
-      'response_format': <String, String>{'type': 'json_object'},
-      'messages': <Map<String, String>>[
-        <String, String>{'role': 'system', 'content': systemPrompt},
-        <String, String>{
-          'role': 'user',
-          'content': jsonEncode(payload),
+    Future<TranslationResult> attemptRequest(String model) async {
+      final Map<String, Object?> body = <String, Object?>{
+        'model': model,
+        'temperature': 0.2,
+        'max_tokens': 160,
+        'response_format': <String, String>{'type': 'json_object'},
+        'messages': <Map<String, String>>[
+          <String, String>{'role': 'system', 'content': systemPrompt},
+          <String, String>{
+            'role': 'user',
+            'content': jsonEncode(payload),
+          },
+        ],
+      };
+
+      final http.Response resp = await _client.postJson(
+        url,
+        headers: <String, String>{
+          'Authorization': 'Bearer $_apiKey',
         },
-      ],
-    };
+        body: body,
+      );
 
-    final http.Response resp = await _client.postJson(
-      url,
-      headers: <String, String>{
-        'Authorization': 'Bearer $_apiKey',
-      },
-      body: body,
-    );
-
-    final Map<String, dynamic> api = safeJsonDecodeToMap(resp.body);
-    final List<dynamic>? choices = api['choices'] as List<dynamic>?;
-    if (choices == null || choices.isEmpty) {
-      throw const FormatException('Réponse OpenAI sans choices.');
-    }
-    final Map<String, dynamic>? msg =
-        choices.first['message'] as Map<String, dynamic>?;
-    final String? content = msg?['content'] as String?;
-    if (content == null) {
-      throw const FormatException('Réponse OpenAI sans message content.');
-    }
-
-    final String jsonText = content;
-    try {
-      final Map<String, dynamic> decoded = safeJsonDecodeToMap(jsonText);
-      return TranslationResult.fromJson(decoded);
-    } on FormatException {
-      final String? extracted = extractFirstJson(jsonText);
-      if (extracted == null) {
-        throw const FormatException(
-            'Contenu non JSON et extraction {...} impossible.');
+      final Map<String, dynamic> api = safeJsonDecodeToMap(resp.body);
+      // If API returned an error object
+      final Map<String, dynamic>? error = api['error'] as Map<String, dynamic>?;
+      if (error != null) {
+        final String message = (error['message'] as String?) ?? 'Unknown error';
+        throw FormatException('OpenAI error: $message');
       }
-      final Map<String, dynamic> decoded = safeJsonDecodeToMap(extracted);
-      return TranslationResult.fromJson(decoded);
+
+      final List<dynamic>? choices = api['choices'] as List<dynamic>?;
+      if (choices == null || choices.isEmpty) {
+        throw const FormatException('Réponse OpenAI sans choices.');
+      }
+      final Map<String, dynamic>? msg =
+          choices.first['message'] as Map<String, dynamic>?;
+      final String? content = msg?['content'] as String?;
+      if (content == null) {
+        throw const FormatException('Réponse OpenAI sans message content.');
+      }
+
+      final String jsonText = content;
+      try {
+        final Map<String, dynamic> decoded = safeJsonDecodeToMap(jsonText);
+        return TranslationResult.fromJson(decoded);
+      } on FormatException {
+        final String? extracted = extractFirstJson(jsonText);
+        if (extracted == null) {
+          throw const FormatException(
+              'Contenu non JSON et extraction {...} impossible.');
+        }
+        final Map<String, dynamic> decoded = safeJsonDecodeToMap(extracted);
+        return TranslationResult.fromJson(decoded);
+      }
+    }
+
+    // Try requested model first, then graceful fallback to gpt-4o-mini on client/unsupported errors.
+    try {
+      return await attemptRequest(_model);
+    } on StateError catch (e) {
+      final String msg = e.toString().toLowerCase();
+      final bool clientIssue = msg.contains('http 4') || msg.contains('unsupported') || msg.contains('model');
+      if (_model != 'gpt-4o-mini' && clientIssue) {
+        return await attemptRequest('gpt-4o-mini');
+      }
+      rethrow;
+    } on FormatException catch (e) {
+      final String msg = e.message.toLowerCase();
+      final bool modelIssue = msg.contains('model') || msg.contains('unsupported');
+      if (_model != 'gpt-4o-mini' && modelIssue) {
+        return await attemptRequest('gpt-4o-mini');
+      }
+      rethrow;
     }
   }
 }

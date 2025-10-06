@@ -26,6 +26,8 @@ class ChatController extends Notifier<List<ChatMessage>> {
   bool _wantPinyin = true;
   bool _isSending = false;
   String? _lastError;
+  final List<String> _pendingTexts = <String>[];
+  Duration _postSendDelay = const Duration(milliseconds: 1200);
 
   String get sourceLang => _sourceLang;
   String get targetLang => _targetLang;
@@ -79,6 +81,12 @@ class ChatController extends Notifier<List<ChatMessage>> {
     ref.notifyListeners();
   }
 
+  void setDirection(String source, String target) {
+    _sourceLang = source;
+    _targetLang = target;
+    ref.notifyListeners();
+  }
+
   void togglePinyin() {
     _wantPinyin = !_wantPinyin;
     ref.notifyListeners();
@@ -90,7 +98,11 @@ class ChatController extends Notifier<List<ChatMessage>> {
   }
 
   Future<void> send(String text) async {
-    if (_isSending || text.trim().isEmpty) return;
+    if (text.trim().isEmpty) return;
+    if (_isSending) {
+      _pendingTexts.add(text);
+      return;
+    }
     if (!(_sourceLang == 'fr' && _targetLang == 'zh') &&
         !(_sourceLang == 'zh' && _targetLang == 'fr')) {
       _lastError = 'Langues supportées: FR ⇄ ZH uniquement.';
@@ -102,6 +114,18 @@ class ChatController extends Notifier<List<ChatMessage>> {
     ref.notifyListeners();
 
     try {
+      // Ajoute d'abord le message de l'utilisateur (comme WhatsApp)
+      final ChatMessage userMsg = ChatMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        originalText: text,
+        translatedText: '',
+        isMe: true,
+        time: DateTime.now(),
+      );
+      state = <ChatMessage>[...state, userMsg];
+      await saveMessages();
+
+      // Appelle la traduction
       final TranslationResult res = await _repo.translate(
         text: text,
         sourceLang: _sourceLang,
@@ -109,22 +133,37 @@ class ChatController extends Notifier<List<ChatMessage>> {
         tone: _tone,
         wantPinyin: _wantPinyin,
       );
-      final ChatMessage msg = ChatMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        originalText: text,
+
+      // Ajoute la bulle de réponse (autre côté)
+      final ChatMessage replyMsg = ChatMessage(
+        id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+        originalText: '',
         translatedText: res.translation,
-        isMe: true,
+        isMe: false,
         time: DateTime.now(),
         pinyin: res.pinyin,
         notes: res.notes,
       );
-      state = <ChatMessage>[...state, msg];
+      state = <ChatMessage>[...state, replyMsg];
       await saveMessages();
     } catch (e) {
-      _lastError = e.toString();
+      final String msg = e.toString();
+      if (msg.contains('429') || msg.toLowerCase().contains('quota')) {
+        _lastError = 'Quota atteint / trop de requêtes. Réessayez dans une minute.';
+        // Allonge le délai avant le prochain envoi
+        _postSendDelay = const Duration(seconds: 60);
+      } else {
+        _lastError = msg;
+        _postSendDelay = const Duration(milliseconds: 1200);
+      }
     } finally {
       _isSending = false;
       ref.notifyListeners();
+      if (_pendingTexts.isNotEmpty) {
+        final String next = _pendingTexts.removeAt(0);
+        // Enchaîne le prochain message après un délai pour limiter les 429
+        Future<void>.delayed(_postSendDelay, () => send(next));
+      }
     }
   }
 }
