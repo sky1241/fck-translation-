@@ -4,6 +4,7 @@ import 'features/chat/presentation/chat_page.dart';
 import 'features/chat/presentation/language_setup_page.dart';
 import 'core/env/app_env.dart';
 import 'features/chat/presentation/chat_controller.dart';
+import 'core/network/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,9 +32,11 @@ class _Startup extends ConsumerStatefulWidget {
 }
 
 class _StartupState extends ConsumerState<_Startup> {
+  final NotificationService _notif = NotificationService();
   @override
   void initState() {
     super.initState();
+    _notif.initialize();
     _decide();
   }
 

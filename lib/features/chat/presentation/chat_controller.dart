@@ -10,6 +10,7 @@ import '../data/models/translation_result.dart';
 import '../domain/i_chat_repository.dart';
 import '../../../core/env/app_env.dart';
 import '../../../core/network/realtime_service.dart';
+import '../../../core/network/notification_service.dart';
 
 final IChatRepository _defaultRepo = ChatRepository();
 
@@ -32,6 +33,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
   final List<String> _pendingTexts = <String>[];
   Duration _postSendDelay = const Duration(milliseconds: 1200);
   RealtimeService? _rt;
+  final NotificationService _notif = NotificationService();
 
   String get sourceLang => _sourceLang;
   String get targetLang => _targetLang;
@@ -63,6 +65,11 @@ class ChatController extends Notifier<List<ChatMessage>> {
           final String? text = msg['text'] as String?;
           if (text == null) return;
           _receiveRemote(text);
+          // Notification locale simple (foreground)
+          _notif.showIncomingMessage(
+            title: _sourceLang == 'fr' ? 'Nouveau message (ZH→FR)' : '新消息 (FR→ZH)',
+            body: text,
+          );
         }
       });
     }
