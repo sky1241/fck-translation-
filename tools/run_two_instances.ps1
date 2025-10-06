@@ -16,7 +16,9 @@ param(
   [string]$PhoneDirection = "zh2fr",
   [string]$PhoneId,
   [string]$EmulatorAvd,
-  [switch]$SkipStartEmu
+  [switch]$SkipStartEmu,
+  [int]$RelayPort = 8765,
+  [switch]$StartRelay
 )
 
 Set-StrictMode -Version Latest
@@ -97,6 +99,16 @@ function Start-EmulatorIfNeeded {
   }
 }
 
+function Start-RelayIfFree {
+  param([int]$Port)
+  try {
+    $tcp = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop
+    if ($tcp) { return }
+  } catch {}
+  Write-Host "Démarrage du relay WebSocket sur le port $Port..." -ForegroundColor Cyan
+  Start-Process pwsh -ArgumentList "-NoProfile","-Command","cd tools; python relay_server.py" | Out-Null
+}
+
 function Get-DeviceIds {
   # Returns a hashtable @{ Emu = 'emulator-5554'; Phone = 'R5...' }
   $lines = adb devices | Select-Object -Skip 1
@@ -143,7 +155,10 @@ Ensure-AdbAvailable
 # 3) Optionally start emulator
 Start-EmulatorIfNeeded -AvdName $EmulatorAvd
 
-# 4) Detect devices
+# 4) Start relay if requested
+if ($StartRelay) { Start-RelayIfFree -Port $RelayPort }
+
+# 5) Detect devices
 $ids = Get-DeviceIds
 $emuId = $ids.Emu
 $phId = if ($PhoneId) { $PhoneId } else { $ids.Phone }
@@ -151,11 +166,11 @@ if (-not $emuId) { Write-Warning "Aucun émulateur détecté." }
 if (-not $phId) { Write-Warning "Aucun téléphone détecté (USB)." }
 if (-not $emuId -and -not $phId) { throw "Aucun device prêt. Branchez le téléphone et/ou lancez un AVD." }
 
-# 5) Restore packages
+# 6) Restore packages
 Write-Host "flutter pub get..." -ForegroundColor Cyan
 flutter pub get | Write-Host
 
-# 6) Prepare command lines
+# 7) Prepare command lines
 $emuDefines = Build-Defines -Direction $EmuDirection -Pinyin $PinyinEmu -ApiKeyValue $ApiKey -BaseUrlValue $BaseUrl -ModelValue $Model -ToneValue $Tone
 $phDefines  = Build-Defines -Direction $PhoneDirection -Pinyin $PinyinPhone -ApiKeyValue $ApiKey -BaseUrlValue $BaseUrl -ModelValue $Model -ToneValue $Tone
 
@@ -165,6 +180,9 @@ if ($emuId) {
   Start-Process pwsh -ArgumentList $emuArgs | Out-Null
 }
 if ($phId) {
+  # Map relay port to phone and use localhost
+  try { adb -s $phId reverse tcp:$RelayPort tcp:$RelayPort | Out-Null } catch {}
+  $phDefines += @("--dart-define=RELAY_WS_URL=ws://127.0.0.1:$RelayPort","--dart-define=RELAY_ROOM=demo123")
   $phArgs = @("-NoProfile","-Command","flutter run -d $phId $($phDefines -join ' ')")
   Write-Host "Lancement instance TÉLÉPHONE ($phId): ZH→FR" -ForegroundColor Green
   Start-Process pwsh -ArgumentList $phArgs | Out-Null
