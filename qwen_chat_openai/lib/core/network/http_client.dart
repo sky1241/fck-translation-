@@ -6,8 +6,8 @@ import 'package:http/http.dart' as http;
 class NetworkConfig {
   const NetworkConfig({
     this.timeout = const Duration(seconds: 20),
-    this.retries = 2,
-    this.backoffBase = const Duration(milliseconds: 500),
+    this.retries = 4,
+    this.backoffBase = const Duration(milliseconds: 1200),
   });
 
   final Duration timeout;
@@ -43,14 +43,42 @@ class AppHttpClient {
         if (resp.statusCode >= 200 && resp.statusCode < 300) {
           return resp;
         }
-        throw http.ClientException(
-            'HTTP ${resp.statusCode}: ${resp.body}', url);
+
+        // Retry policy: 429 or 5xx → retry with backoff/Retry-After; other 4xx → fail fast
+        final int code = resp.statusCode;
+        final bool retryable = code == 429 || (code >= 500 && code < 600);
+        if (!retryable || attempt == _config.retries) {
+          throw http.ClientException('HTTP ${resp.statusCode}: ${resp.body}', url);
+        }
+
+        Duration extra = Duration.zero;
+        if (code == 429) {
+          final String? retryAfter = resp.headers['retry-after'];
+          if (retryAfter != null) {
+            final int? secs = int.tryParse(retryAfter.trim());
+            if (secs != null) {
+              extra = Duration(seconds: secs);
+            }
+          }
+        }
+
+        final int jitterMs = DateTime.now().microsecond % 300;
+        final Duration delay = Duration(
+          milliseconds:
+              _config.backoffBase.inMilliseconds * (attempt + 1) + jitterMs,
+        ) + extra;
+        await Future<void>.delayed(delay);
+        // continue loop
+        attempt++;
+        continue;
       } on Object catch (e) {
         lastError = e;
         if (attempt == _config.retries) break;
+        // Jitter simple basé sur l'horloge pour éviter l'embouteillage
+        final int jitterMs = DateTime.now().microsecond % 300;
         final Duration delay = Duration(
           milliseconds:
-              _config.backoffBase.inMilliseconds * (attempt + 1),
+              _config.backoffBase.inMilliseconds * (attempt + 1) + jitterMs,
         );
         await Future<void>.delayed(delay);
       }
