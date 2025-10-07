@@ -51,15 +51,18 @@ class _StartupState extends ConsumerState<_Startup> {
         await sp.setString('chat_direction', fr2zh ? 'fr2zh' : 'zh2fr');
         final controller = ref.read(chatControllerProvider.notifier);
         controller.setDirection(fr2zh ? 'fr' : 'zh', fr2zh ? 'zh' : 'fr');
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute<Widget>(builder: (_) => const ChatPage()),
         );
         return;
       }
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<Widget>(builder: (_) => const LanguageSetupPage()),
       );
     } else {
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<Widget>(builder: (_) => const ChatPage()),
       );

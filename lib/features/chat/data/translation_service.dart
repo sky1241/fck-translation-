@@ -52,7 +52,6 @@ class TranslationService {
       return TranslationResult(
         translation: mockTranslation,
         pinyin: mockPinyin,
-        notes: null,
       );
     }
 

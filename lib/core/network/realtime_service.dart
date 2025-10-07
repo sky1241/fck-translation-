@@ -22,6 +22,9 @@ class RealtimeService {
     final Uri uri = Uri.parse('${AppEnv.relayWsUrl}?room=${Uri.encodeComponent(AppEnv.relayRoom)}');
     _channel = WebSocketChannel.connect(uri);
     _sub = _channel!.stream.listen((dynamic data) {
+      // Verbose log for relay frames
+      // ignore: avoid_print
+      print('[relay][in] $data');
       try {
         final Map<String, dynamic> map = jsonDecode(data as String) as Map<String, dynamic>;
         _incomingCtrl.add(map);
@@ -39,7 +42,10 @@ class RealtimeService {
 
   Future<void> send(Map<String, Object?> payload) async {
     if (_channel == null) return;
-    _channel!.sink.add(jsonEncode(payload));
+    final String text = jsonEncode(payload);
+    // ignore: avoid_print
+    print('[relay][out] $text');
+    _channel!.sink.add(text);
   }
 
   Future<void> dispose() async {

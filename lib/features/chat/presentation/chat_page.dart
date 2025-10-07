@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'chat_controller.dart';
 import 'widgets/composer_bar.dart';
 import 'widgets/message_bubble.dart';
+import '../../../core/network/badge_service.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -22,6 +23,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     Future<void>(() async {
       await ref.read(chatControllerProvider.notifier).loadMessages();
     });
+    // Opening chat clears the unread badge
+    Future<void>(() async { await BadgeService.clear(); });
   }
 
   @override

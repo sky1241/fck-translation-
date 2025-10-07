@@ -11,6 +11,7 @@ import '../domain/i_chat_repository.dart';
 import '../../../core/env/app_env.dart';
 import '../../../core/network/realtime_service.dart';
 import '../../../core/network/notification_service.dart';
+import '../../../core/network/badge_service.dart';
 
 final IChatRepository _defaultRepo = ChatRepository();
 
@@ -70,6 +71,8 @@ class ChatController extends Notifier<List<ChatMessage>> {
             title: _sourceLang == 'fr' ? 'Nouveau message (ZH→FR)' : '新消息 (FR→ZH)',
             body: text,
           );
+          // Increment badge for unread
+          unawaited(BadgeService.increment());
         }
       });
     }
@@ -129,6 +132,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
   Future<void> clear() async {
     state = <ChatMessage>[];
     await saveMessages();
+    await BadgeService.clear();
   }
 
   Future<void> send(String text, {bool broadcast = true}) async {
