@@ -13,10 +13,9 @@ import '../../../core/network/realtime_service.dart';
 import '../../../core/network/notification_service.dart';
 import '../../../core/network/badge_service.dart';
 import '../../../core/media/attachment_picker_service.dart';
-import '../../features/chat/data/models/attachment.dart';
+import '../data/models/attachment.dart';
 import '../../../core/network/upload/cloud_upload_service.dart';
 import '../../../core/network/upload/upload_service.dart';
-import '../../../core/env/app_env.dart';
 
 final IChatRepository _defaultRepo = ChatRepository();
 

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'chat_controller.dart';
 import 'widgets/composer_bar.dart';
 import 'widgets/message_bubble.dart';
+import 'widgets/attachment_bubble.dart';
+import '../data/models/attachment.dart';
 import '../../../core/network/badge_service.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -44,11 +46,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             onPressed: controller.swapDirection,
             icon: const Icon(Icons.swap_horiz),
           ),
-          IconButton(
-            tooltip: 'Effacer',
-            onPressed: controller.clear,
-            icon: const Icon(Icons.delete_outline),
-          ),
         ],
       ),
       body: Column(
@@ -73,6 +70,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               itemCount: messages.length,
               itemBuilder: (BuildContext context, int index) {
                 final m = messages[index];
+                if (m.attachments.isNotEmpty) {
+                  // Display first attachment for MVP (can extend to list/column)
+                  final Attachment a = m.attachments.first;
+                  return AttachmentBubble(attachment: a, isMe: m.isMe);
+                }
                 return MessageBubble(
                   isMe: m.isMe,
                   original: m.originalText,
@@ -83,13 +85,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 );
               },
             ),
-          ),
+              ),
           ComposerBar(
             controller: _textCtrl,
             enabled: true,
             hintText: controller.sourceLang == 'fr'
                 ? 'Écrire en français…'
                 : '用中文输入…',
+                onPickAttachment: () async {
+                  await ref.read(chatControllerProvider.notifier).pickAndSendAttachment();
+                },
             onSend: () async {
               final text = _textCtrl.text;
               _textCtrl.clear();
