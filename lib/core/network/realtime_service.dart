@@ -12,8 +12,8 @@ class RealtimeService {
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
-  String _url;
-  String _room;
+  final String _url;
+  final String _room;
 
   final StreamController<Map<String, dynamic>> _incomingCtrl =
       StreamController<Map<String, dynamic>>.broadcast();

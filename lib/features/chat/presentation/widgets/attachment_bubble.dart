@@ -9,7 +9,7 @@ class AttachmentBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color bubble = isMe ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceVariant;
+    final Color bubble = isMe ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerHighest;
     final BorderRadius radius = BorderRadius.only(
       topLeft: const Radius.circular(12),
       topRight: const Radius.circular(12),

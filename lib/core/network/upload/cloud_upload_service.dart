@@ -18,7 +18,11 @@ class CloudUploadService implements UploadService {
     yield UploadProgress(percent: 10);
     final uri = Uri.parse('$endpointBase/upload');
     final req = http.MultipartRequest('POST', uri);
-    req.files.add(await http.MultipartFile.fromPath('file', draft.sourcePath, contentType: _contentType(draft.mimeType)));
+    req.files.add(await http.MultipartFile.fromPath(
+      'file',
+      draft.sourcePath,
+      contentType: _contentType(draft.mimeType),
+    ));
     req.fields['kind'] = draft.kind.name;
     final resp = await req.send();
     yield UploadProgress(percent: 70);

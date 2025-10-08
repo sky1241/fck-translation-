@@ -21,9 +21,6 @@ class NotificationService {
       'incoming_messages',
       'Incoming Messages',
       channelDescription: 'Notifications for new incoming chat messages',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
-      channelShowBadge: true,
       number: count, // Shown as badge count on supported launchers
     );
     final NotificationDetails details = NotificationDetails(android: android);

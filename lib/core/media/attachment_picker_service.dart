@@ -10,11 +10,17 @@ class AttachmentPickerService {
     if (x == null) return null;
     // image_picker may not provide MIME; best-effort guess
     final String mime = _guessMime(x.path, fallback: 'image/jpeg');
+    int? size;
+    try {
+      size = await x.length();
+    } catch (_) {
+      size = null;
+    }
     return AttachmentDraft(
       kind: AttachmentKind.image,
       sourcePath: x.path,
       mimeType: mime,
-      estimatedBytes: await x.length().catchError((_) => null),
+      estimatedBytes: size,
     );
   }
 
@@ -22,11 +28,17 @@ class AttachmentPickerService {
   Future<AttachmentDraft?> pickVideo() async {
     final XFile? x = await _picker.pickVideo(source: ImageSource.gallery);
     if (x == null) return null;
+    int? size;
+    try {
+      size = await x.length();
+    } catch (_) {
+      size = null;
+    }
     return AttachmentDraft(
       kind: AttachmentKind.video,
       sourcePath: x.path,
       mimeType: 'video/mp4',
-      estimatedBytes: await x.length().catchError((_) => null),
+      estimatedBytes: size,
     );
   }
 
