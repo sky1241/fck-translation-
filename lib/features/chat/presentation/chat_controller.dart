@@ -12,6 +12,11 @@ import '../../../core/env/app_env.dart';
 import '../../../core/network/realtime_service.dart';
 import '../../../core/network/notification_service.dart';
 import '../../../core/network/badge_service.dart';
+import '../../../core/media/attachment_picker_service.dart';
+import '../../features/chat/data/models/attachment.dart';
+import '../../../core/network/upload/cloud_upload_service.dart';
+import '../../../core/network/upload/upload_service.dart';
+import '../../../core/env/app_env.dart';
 
 final IChatRepository _defaultRepo = ChatRepository();
 
@@ -35,6 +40,8 @@ class ChatController extends Notifier<List<ChatMessage>> {
   Duration _postSendDelay = const Duration(milliseconds: 1200);
   RealtimeService? _rt;
   final NotificationService _notif = NotificationService();
+  final AttachmentPickerService _picker = AttachmentPickerService();
+  late final UploadService _uploader = CloudUploadService(endpointBase: AppEnv.uploadBaseUrl);
 
   String get sourceLang => _sourceLang;
   String get targetLang => _targetLang;
@@ -56,9 +63,9 @@ class ChatController extends Notifier<List<ChatMessage>> {
     }
     _tone = AppEnv.defaultTone;
     _wantPinyin = AppEnv.defaultPinyin;
-    // Connect realtime relay if configured
-    if (AppEnv.relayWsUrl.isNotEmpty && AppEnv.relayRoom.isNotEmpty) {
-      _rt = RealtimeService();
+    // Connect realtime relay if a room is present; URL may be provided at build or defaulted elsewhere
+    if (AppEnv.relayRoom.isNotEmpty) {
+      _rt = RealtimeService(url: AppEnv.relayWsUrl, room: AppEnv.relayRoom);
       _rt!.connect();
       _rt!.messages.listen((Map<String, dynamic> msg) {
         final String? kind = msg['type'] as String?;
@@ -72,6 +79,38 @@ class ChatController extends Notifier<List<ChatMessage>> {
             body: text,
           );
           // Increment badge for unread
+          unawaited(BadgeService.increment());
+        } else if (kind == 'attachment') {
+          final String? url = msg['url'] as String?;
+          final String? id = msg['id'] as String?;
+          final String? mime = msg['mime'] as String?;
+          final String? k = msg['kind'] as String?; // image|video
+          final String? b64 = msg['base64'] as String?;
+          if (url == null || id == null || mime == null || k == null) return;
+          final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
+          final Attachment att = Attachment(
+            id: id,
+            kind: kindAtt,
+            mimeType: mime,
+            remoteUrl: url,
+            createdAt: DateTime.now(),
+            status: AttachmentStatus.uploaded,
+          );
+          final ChatMessage m = ChatMessage(
+            id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+            originalText: '',
+            translatedText: '',
+            isMe: false,
+            time: DateTime.now(),
+            attachments: <Attachment>[att],
+          );
+          state = <ChatMessage>[...state, m];
+          saveMessages();
+          ref.notifyListeners();
+          _notif.showIncomingMessage(
+            title: _sourceLang == 'fr' ? 'Pièce jointe reçue' : '收到附件',
+            body: mime,
+          );
           unawaited(BadgeService.increment());
         }
       });
@@ -133,6 +172,59 @@ class ChatController extends Notifier<List<ChatMessage>> {
     state = <ChatMessage>[];
     await saveMessages();
     await BadgeService.clear();
+  }
+
+  Future<void> pickAndSendAttachment() async {
+    final AttachmentDraft? draft = await _picker.pickImage();
+    if (draft == null) return;
+    final String attId = DateTime.now().microsecondsSinceEpoch.toString();
+    final Attachment pending = Attachment(
+      id: attId,
+      kind: draft.kind,
+      mimeType: draft.mimeType,
+      localPath: draft.sourcePath,
+      createdAt: DateTime.now(),
+      status: AttachmentStatus.uploading,
+    );
+    final ChatMessage msg = ChatMessage(
+      id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+      originalText: '',
+      translatedText: '',
+      isMe: true,
+      time: DateTime.now(),
+      attachments: <Attachment>[pending],
+    );
+    state = <ChatMessage>[...state, msg];
+    ref.notifyListeners();
+
+    // Upload with progress; on completion broadcast URL
+    _uploader.upload(draft).listen((UploadProgress p) async {
+      final List<ChatMessage> updated = state.map((m) {
+        if (m.id != msg.id) return m;
+        final Attachment a = m.attachments.first.copyWith(
+          status: (p.remoteUrl != null) ? AttachmentStatus.uploaded : AttachmentStatus.uploading,
+        );
+        return m.copyWith(attachments: <Attachment>[a]);
+      }).toList(growable: false);
+      state = updated;
+      ref.notifyListeners();
+
+      if (p.remoteUrl != null || p.base64Data != null) {
+        // Broadcast metadata via relay if enabled
+        if (_rt != null && _rt!.enabled) {
+          unawaited(_rt!.send(<String, Object?>{
+            'type': 'attachment',
+            'id': attId,
+            'kind': draft.kind.name,
+            'mime': draft.mimeType,
+            'url': p.remoteUrl,
+            if (p.base64Data != null) 'base64': p.base64Data,
+            'ts': DateTime.now().toIso8601String(),
+          }));
+        }
+        await saveMessages();
+      }
+    });
   }
 
   Future<void> send(String text, {bool broadcast = true}) async {

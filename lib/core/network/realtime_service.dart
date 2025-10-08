@@ -5,21 +5,29 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../env/app_env.dart';
 
 class RealtimeService {
-  RealtimeService({WebSocketChannel? channel}) : _channel = channel;
+  RealtimeService({required String url, required String room, WebSocketChannel? channel})
+      : _url = url,
+        _room = room,
+        _channel = channel;
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
+  String _url;
+  String _room;
 
   final StreamController<Map<String, dynamic>> _incomingCtrl =
       StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get messages => _incomingCtrl.stream;
 
-  bool get enabled => AppEnv.relayWsUrl.isNotEmpty && AppEnv.relayRoom.isNotEmpty;
+  bool get enabled => (_url.isNotEmpty || AppEnv.relayWsUrl.isNotEmpty) && _room.isNotEmpty;
 
   Future<void> connect() async {
     if (!enabled) return;
     if (_channel != null) return;
-    final Uri uri = Uri.parse('${AppEnv.relayWsUrl}?room=${Uri.encodeComponent(AppEnv.relayRoom)}');
+    final String effectiveUrl = _url.isNotEmpty
+        ? _url
+        : AppEnv.relayWsUrl;
+    final Uri uri = Uri.parse('$effectiveUrl?room=${Uri.encodeComponent(_room)}');
     _channel = WebSocketChannel.connect(uri);
     _sub = _channel!.stream.listen((dynamic data) {
       // Verbose log for relay frames

@@ -4,7 +4,6 @@ import 'features/chat/presentation/chat_page.dart';
 import 'features/chat/presentation/language_setup_page.dart';
 import 'core/env/app_env.dart';
 import 'features/chat/presentation/chat_controller.dart';
-import 'core/network/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,7 +17,17 @@ class App extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
+        brightness: Brightness.light,
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.teal,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+        brightness: Brightness.dark,
+      ),
+      themeMode: ThemeMode.dark,
       home: const _Startup(),
     );
   }
@@ -32,11 +41,9 @@ class _Startup extends ConsumerStatefulWidget {
 }
 
 class _StartupState extends ConsumerState<_Startup> {
-  final NotificationService _notif = NotificationService();
   @override
   void initState() {
     super.initState();
-    _notif.initialize();
     _decide();
   }
 
@@ -45,7 +52,7 @@ class _StartupState extends ConsumerState<_Startup> {
     final String? dir = sp.getString('chat_direction');
     if (!mounted) return;
     if (dir == null) {
-      // If compile-time default is set, apply it and skip the setup page
+      // If compile-time default is set (or defaulted), apply it and skip the setup page
       if (AppEnv.defaultDirection == 'fr2zh' || AppEnv.defaultDirection == 'zh2fr') {
         final bool fr2zh = AppEnv.defaultDirection == 'fr2zh';
         await sp.setString('chat_direction', fr2zh ? 'fr2zh' : 'zh2fr');
