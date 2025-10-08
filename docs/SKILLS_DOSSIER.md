@@ -13,7 +13,9 @@ Compétences techniques
 - Parsing JSON strict et fallback: extraction du premier objet `{...}` si nécessaire.
 - WebSocket: conception d’un relay minimal (rooms), écoute/broadcast, prévention des boucles d’écho.
 - Sécurité dev: non-commit des secrets, `.gitignore`, variables d’environnement.
-- Tooling: script PowerShell d’orchestration multi-devices, `adb reverse` pour accès localhost depuis téléphone.
+- Tooling: script PowerShell d’orchestration multi-devices, `adb reverse` (debug), scrcpy, CI GitHub Actions.
+- Badging & notifications: incrément non‑lus, remise à zéro, injection du nombre dans la notification (Android).
+- Realtime paramétrable: RealtimeService (URL/room injectés), guide de connexion LAN/10.0.2.2/wss.
 - Documentation: rapport journalier, présentation projet, README enrichi.
 
 Compétences méthodologiques
@@ -32,3 +34,4 @@ Pistes d’amélioration
 - Monter les dépendances (Riverpod 3, Freezed 3, analyzer 8) après audit.
 - Ajouter des exemples few-shot supplémentaires et réglages de ton/contextes.
 - Ajouter accusés de réception et meilleure gestion d’état du relay.
+ - Héberger un relay wss public et figer RELAY_WS_URL/ROOM dans la release “no‑touch”.
