@@ -3,6 +3,8 @@ class AppEnv {
   static const String apiKey = String.fromEnvironment('OPENAI_API_KEY');
   static const String model =
       String.fromEnvironment('OPENAI_MODEL', defaultValue: 'gpt-4o-mini');
+  static const String project =
+      String.fromEnvironment('OPENAI_PROJECT');
   static const bool mockMode = bool.fromEnvironment('MOCK_MODE');
 
   // Optional app-level defaults so we can launch two instances with different settings

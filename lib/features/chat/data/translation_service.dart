@@ -115,6 +115,7 @@ class TranslationService {
         url,
         headers: <String, String>{
           'Authorization': 'Bearer $_apiKey',
+          if (AppEnv.project.isNotEmpty) 'OpenAI-Project': AppEnv.project,
         },
         body: body,
       );

@@ -7,7 +7,6 @@ import 'widgets/message_bubble.dart';
 import 'widgets/attachment_bubble.dart';
 import '../data/models/attachment.dart';
 import '../../../core/network/badge_service.dart';
-import '../../settings/settings_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -46,19 +45,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             tooltip: 'Swap',
             onPressed: controller.swapDirection,
             icon: const Icon(Icons.swap_horiz),
-          ),
-          IconButton(
-            tooltip: 'Réglages',
-            onPressed: () async {
-              final changed = await Navigator.of(context).push(
-                MaterialPageRoute<bool>(builder: (_) => const SettingsPage()),
-              );
-              if (changed == true && mounted) {
-                // force UI refresh; next requests utiliseront les overrides
-                setState(() {});
-              }
-            },
-            icon: const Icon(Icons.settings),
           ),
         ],
       ),
