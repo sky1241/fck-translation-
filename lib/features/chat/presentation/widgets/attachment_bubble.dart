@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import '../../data/models/attachment.dart';
 
 class AttachmentBubble extends StatelessWidget {
-  const AttachmentBubble({super.key, required this.attachment, required this.isMe});
+  const AttachmentBubble({super.key, required this.attachment, required this.isMe, this.time});
 
   final Attachment attachment;
   final bool isMe;
+  final DateTime? time;
 
   @override
   Widget build(BuildContext context) {
@@ -22,14 +24,34 @@ class AttachmentBubble extends StatelessWidget {
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(color: bubble, borderRadius: radius),
       constraints: const BoxConstraints(maxWidth: 320),
-      child: _buildContent(context),
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _buildContent(context),
+          if (time != null) ...<Widget>[
+            const SizedBox(height: 6),
+            const SizedBox(height: 2),
+            Text(
+              _formatTime(time!),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
   Widget _buildContent(BuildContext context) {
     if (attachment.kind == AttachmentKind.image) {
       final String? url = attachment.remoteUrl;
-      final ImageProvider? image = url != null ? NetworkImage(url) : null;
+      final String? local = attachment.localPath;
+      final ImageProvider? image =
+          url != null ? NetworkImage(url) : (local != null ? FileImage(File(local)) : null);
       return AspectRatio(
         aspectRatio: (attachment.width != null && attachment.height != null && attachment.height! > 0)
             ? (attachment.width! / attachment.height!)
@@ -56,6 +78,12 @@ class AttachmentBubble extends StatelessWidget {
       ],
     );
   }
+}
+
+String _formatTime(DateTime t) {
+  final String hh = t.hour.toString().padLeft(2, '0');
+  final String mm = t.minute.toString().padLeft(2, '0');
+  return '$hh:$mm';
 }
 
 

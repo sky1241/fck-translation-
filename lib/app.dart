@@ -44,7 +44,12 @@ class _StartupState extends ConsumerState<_Startup> {
   @override
   void initState() {
     super.initState();
-    _decide();
+    // Defer navigation until after the first frame to avoid black screens on some OEMs
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _decide();
+      }
+    });
   }
 
   Future<void> _decide() async {

@@ -7,6 +7,7 @@ import 'widgets/message_bubble.dart';
 import 'widgets/attachment_bubble.dart';
 import '../data/models/attachment.dart';
 import '../../../core/network/badge_service.dart';
+import '../../settings/settings_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -46,6 +47,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             onPressed: controller.swapDirection,
             icon: const Icon(Icons.swap_horiz),
           ),
+          IconButton(
+            tooltip: 'Réglages',
+            onPressed: () async {
+              final changed = await Navigator.of(context).push(
+                MaterialPageRoute<bool>(builder: (_) => const SettingsPage()),
+              );
+              if (changed == true && mounted) {
+                // force UI refresh; next requests utiliseront les overrides
+                setState(() {});
+              }
+            },
+            icon: const Icon(Icons.settings),
+          ),
         ],
       ),
       body: Column(
@@ -55,9 +69,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               content: Text(controller.lastError!),
               actions: <Widget>[
                 TextButton(
-                  onPressed: () => ref
-                      .read(chatControllerProvider.notifier)
-                      .swapDirection(),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                    // Clear the error explicitly
+                    ref.read(chatControllerProvider.notifier).clearError();
+                  },
                   child: const Text('OK'),
                 ),
               ],
@@ -73,7 +89,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 if (m.attachments.isNotEmpty) {
                   // Display first attachment for MVP (can extend to list/column)
                   final Attachment a = m.attachments.first;
-                  return AttachmentBubble(attachment: a, isMe: m.isMe);
+                  return AttachmentBubble(attachment: a, isMe: m.isMe, time: m.time);
                 }
                 return MessageBubble(
                   isMe: m.isMe,

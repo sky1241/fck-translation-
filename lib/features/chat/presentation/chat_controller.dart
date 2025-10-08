@@ -84,7 +84,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
           final String? id = msg['id'] as String?;
           final String? mime = msg['mime'] as String?;
           final String? k = msg['kind'] as String?; // image|video
-          final String? b64 = msg['base64'] as String?;
+          // Base64 relay is supported but optional; we ignore it client-side here
           if (url == null || id == null || mime == null || k == null) return;
           final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
           final Attachment att = Attachment(
@@ -153,6 +153,11 @@ class ChatController extends Notifier<List<ChatMessage>> {
 
   void setTone(String tone) {
     _tone = tone;
+    ref.notifyListeners();
+  }
+
+  void clearError() {
+    _lastError = null;
     ref.notifyListeners();
   }
 

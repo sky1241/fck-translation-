@@ -7,9 +7,14 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _fln;
 
   Future<void> initialize() async {
-    const AndroidInitializationSettings androidInit = AndroidInitializationSettings('ic_launcher');
+    // Use a dedicated small icon in drawable for notifications
+    const AndroidInitializationSettings androidInit = AndroidInitializationSettings('ic_stat_notification');
     const InitializationSettings init = InitializationSettings(android: androidInit);
-    await _fln.initialize(init);
+    try {
+      await _fln.initialize(init);
+    } catch (_) {
+      // Swallow initialization errors to avoid blocking app startup
+    }
   }
 
   Future<void> showIncomingMessage({required String title, required String body}) async {
