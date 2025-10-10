@@ -3,7 +3,7 @@
 FROM dart:stable AS build
 WORKDIR /app
 COPY tools/relay_server.dart tools/relay_server.dart
-RUN dart compile exe tools/relay_server.dart -o /app/bin/relay
+RUN mkdir -p /app/bin && dart compile exe tools/relay_server.dart -o /app/bin/relay
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
