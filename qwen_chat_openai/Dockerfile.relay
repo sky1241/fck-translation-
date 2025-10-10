@@ -1,0 +1,17 @@
+# Dockerfile for WebSocket relay on Render (Free Web Service)
+
+FROM dart:stable AS build
+WORKDIR /app
+COPY pubspec.* ./
+RUN dart pub get
+COPY . .
+RUN dart compile exe tools/relay_server.dart -o /app/bin/relay
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build /app/bin/relay /usr/local/bin/relay
+ENV RELAY_PORT=8080
+EXPOSE 8080
+CMD ["relay"]
+
+
