@@ -2,9 +2,8 @@
 
 FROM dart:stable AS build
 WORKDIR /app
-COPY pubspec.* ./
-RUN dart pub get
-COPY . .
+# Copy only what we need to compile the standalone Dart server
+COPY tools/openai_proxy.dart tools/openai_proxy.dart
 RUN dart compile exe tools/openai_proxy.dart -o /app/bin/proxy
 
 FROM debian:bookworm-slim

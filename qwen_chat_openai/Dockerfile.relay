@@ -2,9 +2,7 @@
 
 FROM dart:stable AS build
 WORKDIR /app
-COPY pubspec.* ./
-RUN dart pub get
-COPY . .
+COPY tools/relay_server.dart tools/relay_server.dart
 RUN dart compile exe tools/relay_server.dart -o /app/bin/relay
 
 FROM debian:bookworm-slim
