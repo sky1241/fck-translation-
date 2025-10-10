@@ -1,0 +1,17 @@
+# Dockerfile for OpenAI proxy on Render (Free Web Service)
+
+FROM dart:stable AS build
+WORKDIR /app
+COPY pubspec.* ./
+RUN dart pub get
+COPY . .
+RUN dart compile exe tools/openai_proxy.dart -o /app/bin/proxy
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build /app/bin/proxy /usr/local/bin/proxy
+ENV PORT=8080
+EXPOSE 8080
+CMD ["proxy"]
+
+
