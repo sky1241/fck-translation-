@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'chat_controller.dart';
 import 'widgets/composer_bar.dart';
 import 'widgets/message_bubble.dart';
+import 'widgets/attachment_bubble.dart';
+import '../data/models/attachment.dart';
+import '../../../core/network/badge_service.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -21,7 +24,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     super.initState();
     Future<void>(() async {
       await ref.read(chatControllerProvider.notifier).loadMessages();
+      // Auto-scroll to bottom on first open, after messages are loaded
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_listCtrl.hasClients) {
+          _listCtrl.jumpTo(_listCtrl.position.maxScrollExtent);
+        }
+      });
     });
+    // Opening chat clears the unread badge
+    Future<void>(() async { await BadgeService.clear(); });
   }
 
   @override
@@ -41,11 +54,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             onPressed: controller.swapDirection,
             icon: const Icon(Icons.swap_horiz),
           ),
-          IconButton(
-            tooltip: 'Effacer',
-            onPressed: controller.clear,
-            icon: const Icon(Icons.delete_outline),
-          ),
         ],
       ),
       body: Column(
@@ -55,9 +63,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               content: Text(controller.lastError!),
               actions: <Widget>[
                 TextButton(
-                  onPressed: () => ref
-                      .read(chatControllerProvider.notifier)
-                      .swapDirection(),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                    // Clear the error explicitly
+                    ref.read(chatControllerProvider.notifier).clearError();
+                  },
                   child: const Text('OK'),
                 ),
               ],
@@ -70,6 +80,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               itemCount: messages.length,
               itemBuilder: (BuildContext context, int index) {
                 final m = messages[index];
+                if (m.attachments.isNotEmpty) {
+                  // Display first attachment for MVP (can extend to list/column)
+                  final Attachment a = m.attachments.first;
+                  return AttachmentBubble(attachment: a, isMe: m.isMe, time: m.time);
+                }
                 return MessageBubble(
                   isMe: m.isMe,
                   original: m.originalText,
@@ -80,13 +95,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 );
               },
             ),
-          ),
+              ),
           ComposerBar(
             controller: _textCtrl,
             enabled: true,
             hintText: controller.sourceLang == 'fr'
                 ? 'Écrire en français…'
                 : '用中文输入…',
+                onPickAttachment: () async {
+                  await ref.read(chatControllerProvider.notifier).pickAndSendAttachment();
+                },
             onSend: () async {
               final text = _textCtrl.text;
               _textCtrl.clear();
