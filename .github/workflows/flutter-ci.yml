@@ -21,6 +21,9 @@ jobs:
         with:
           channel: stable
 
+      - name: Flutter Doctor
+        run: flutter doctor -v
+
       - name: Flutter Pub Get
         run: flutter pub get
 
@@ -28,7 +31,7 @@ jobs:
         run: flutter analyze
 
       - name: Run tests
-        run: flutter test
+        run: flutter test -r expanded -j 1
 
       # APK build requires full Android toolchain on CI; keep CI fast and stable
       # by limiting to analysis and tests. Release builds are produced locally.
