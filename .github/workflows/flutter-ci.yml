@@ -30,6 +30,6 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      - name: Build debug APK (sanity)
-        run: flutter build apk --debug
+      # APK build requires full Android toolchain on CI; keep CI fast and stable
+      # by limiting to analysis and tests. Release builds are produced locally.
 
