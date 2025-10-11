@@ -1,5 +1,8 @@
 class AppEnv {
-  static const String baseUrl = String.fromEnvironment('OPENAI_BASE_URL');
+  static const String baseUrl = String.fromEnvironment(
+    'OPENAI_BASE_URL',
+    defaultValue: 'https://fck-openai-proxy.onrender.com/v1/chat/completions',
+  );
   static const String apiKey = String.fromEnvironment('OPENAI_API_KEY');
   static const String model =
       String.fromEnvironment('OPENAI_MODEL', defaultValue: 'gpt-4o-mini');
@@ -18,8 +21,10 @@ class AppEnv {
       bool.fromEnvironment('CHAT_DEFAULT_PINYIN', defaultValue: true);
 
   // Optional realtime relay (WebSocket). If empty, realtime is disabled.
-  static const String relayWsUrl =
-      String.fromEnvironment('RELAY_WS_URL');
+  static const String relayWsUrl = String.fromEnvironment(
+    'RELAY_WS_URL',
+    defaultValue: 'wss://fck-relay-ws.onrender.com',
+  );
   static const String relayRoom =
       String.fromEnvironment('RELAY_ROOM', defaultValue: 'demo123');
 
