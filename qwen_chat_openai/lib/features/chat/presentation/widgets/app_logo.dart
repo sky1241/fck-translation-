@@ -12,7 +12,6 @@ class AppLogo extends StatelessWidget {
       'assets/icons/app_logo.svg',
       width: size,
       height: size,
-      fit: BoxFit.contain,
     );
   }
 }
