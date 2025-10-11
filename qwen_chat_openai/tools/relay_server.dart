@@ -10,6 +10,14 @@ Future<void> main(List<String> args) async {
   final Map<String, Set<WebSocket>> roomToSockets = <String, Set<WebSocket>>{};
 
   await for (HttpRequest req in server) {
+    if (req.method == 'GET' && req.uri.path == '/health') {
+      req.response
+        ..statusCode = HttpStatus.ok
+        ..headers.set(HttpHeaders.contentTypeHeader, 'application/json')
+        ..write('{"status":"ok"}')
+        ..close();
+      continue;
+    }
     if (req.uri.path != '/' || req.headers.value('upgrade')?.toLowerCase() != 'websocket') {
       req.response
         ..statusCode = HttpStatus.notFound

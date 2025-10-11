@@ -26,6 +26,13 @@ Future<void> _handle(HttpRequest req) async {
     await req.response.close();
     return;
   }
+  if (req.method == 'GET' && req.uri.path == '/health') {
+    req.response.statusCode = HttpStatus.ok;
+    req.response.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+    req.response.write('{"status":"ok"}');
+    await req.response.close();
+    return;
+  }
   if (req.method != 'POST' || req.uri.path != '/v1/chat/completions') {
     req.response.statusCode = HttpStatus.notFound;
     req.response.write('Not Found');
