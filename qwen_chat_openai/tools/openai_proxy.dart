@@ -11,6 +11,8 @@ Future<void> main() async {
   final int port = int.tryParse(Platform.environment['PORT'] ?? '') ?? 8787;
   // Bind to all interfaces for cloud hosts (Render/containers)
   final HttpServer server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+  // print kept for simple container logs; use a logger in production
+  // ignore: avoid_print
   print('OpenAI proxy listening on http://localhost:$port');
   await for (HttpRequest req in server) {
     _handle(req);

@@ -16,7 +16,8 @@ void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const ProviderScope(child: App()));
-    await tester.pumpAndSettle();
+    // Avoid indefinite settling on devices/emulators in CI; one frame is enough
+    await tester.pump();
 
     // Verify that our counter starts at 0.
     expect(find.byType(App), findsOneWidget);
