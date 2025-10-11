@@ -7,12 +7,14 @@ class ComposerBar extends StatelessWidget {
     required this.onSend,
     required this.enabled,
     required this.hintText,
+    this.onPickAttachment,
   });
 
   final TextEditingController controller;
   final VoidCallback onSend;
   final bool enabled;
   final String hintText;
+  final VoidCallback? onPickAttachment;
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +24,11 @@ class ComposerBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
         child: Row(
           children: <Widget>[
+            IconButton(
+              tooltip: 'Pièce jointe',
+              onPressed: enabled ? onPickAttachment : null,
+              icon: const Icon(Icons.add),
+            ),
             Expanded(
               child: TextField(
                 controller: controller,

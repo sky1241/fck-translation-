@@ -2,6 +2,23 @@
 
 Chat FR ↔ ZH (zh-Hans) basé sur OpenAI Chat Completions (ChatGPT), UI type WhatsApp.
 
+## Rapport du 2025-10-06
+
+Ce qui a été fait aujourd'hui:
+
+- Paramétrage compile-time des préférences: direction (FR→ZH / ZH→FR), ton, pinyin.
+- Ajout d'un service de traduction robuste (JSON strict + fallback extraction).
+- Mise en place d'un relay WebSocket minimal et intégration temps réel (Edge ↔ Android).
+- Script PowerShell pour lancer deux instances (émulateur/téléphone) et web.
+- Sécurisation: prise en charge des clés via `--dart-define`, variables d'env, ou fichier local ignoré.
+- Corrections UI/flux: envoi en file d'attente, gestion 429, direction swap, réception relay sans écho.
+
+Points restants/risques:
+
+- Windows Desktop nécessite Developer Mode pour les plugins; on utilise Edge pour le web.
+- Émulateur Android non disponible localement (SDK non configuré); téléphone + Edge OK.
+- Plusieurs dépendances ont des mises à jour majeures (audit prévu avant montée de version).
+
 ## Configuration
 
 Ne commitez aucun secret. Utilisez `--dart-define`:

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,14 @@ import '../data/chat_repository.dart';
 import '../data/models/chat_message.dart';
 import '../data/models/translation_result.dart';
 import '../domain/i_chat_repository.dart';
+import '../../../core/env/app_env.dart';
+import '../../../core/network/realtime_service.dart';
+import '../../../core/network/notification_service.dart';
+import '../../../core/network/badge_service.dart';
+import '../../../core/media/attachment_picker_service.dart';
+import '../data/models/attachment.dart';
+import '../../../core/network/upload/cloud_upload_service.dart';
+import '../../../core/network/upload/upload_service.dart';
 
 final IChatRepository _defaultRepo = ChatRepository();
 
@@ -28,6 +37,10 @@ class ChatController extends Notifier<List<ChatMessage>> {
   String? _lastError;
   final List<String> _pendingTexts = <String>[];
   Duration _postSendDelay = const Duration(milliseconds: 1200);
+  RealtimeService? _rt;
+  final NotificationService _notif = NotificationService();
+  final AttachmentPickerService _picker = AttachmentPickerService();
+  late final UploadService _uploader = CloudUploadService(endpointBase: AppEnv.uploadBaseUrl);
 
   String get sourceLang => _sourceLang;
   String get targetLang => _targetLang;
@@ -39,6 +52,68 @@ class ChatController extends Notifier<List<ChatMessage>> {
   @override
   List<ChatMessage> build() {
     _repo = ref.read(chatRepositoryProvider);
+    // Apply compile-time defaults at first build if any
+    if (AppEnv.defaultDirection == 'fr2zh') {
+      _sourceLang = 'fr';
+      _targetLang = 'zh';
+    } else if (AppEnv.defaultDirection == 'zh2fr') {
+      _sourceLang = 'zh';
+      _targetLang = 'fr';
+    }
+    _tone = AppEnv.defaultTone;
+    _wantPinyin = AppEnv.defaultPinyin;
+    // Connect realtime relay if a room is present; URL may be provided at build or defaulted elsewhere
+    if (AppEnv.relayRoom.isNotEmpty) {
+      _rt = RealtimeService(url: AppEnv.relayWsUrl, room: AppEnv.relayRoom);
+      _rt!.connect();
+      _rt!.messages.listen((Map<String, dynamic> msg) {
+        final String? kind = msg['type'] as String?;
+        if (kind == 'text') {
+          final String? text = msg['text'] as String?;
+          if (text == null) return;
+          _receiveRemote(text);
+          // Notification locale simple (foreground)
+          _notif.showIncomingMessage(
+            title: _sourceLang == 'fr' ? 'Nouveau message (ZH→FR)' : '新消息 (FR→ZH)',
+            body: text,
+          );
+          // Increment badge for unread
+          unawaited(BadgeService.increment());
+        } else if (kind == 'attachment') {
+          final String? url = msg['url'] as String?;
+          final String? id = msg['id'] as String?;
+          final String? mime = msg['mime'] as String?;
+          final String? k = msg['kind'] as String?; // image|video
+          // Base64 relay is supported but optional; we ignore it client-side here
+          if (url == null || id == null || mime == null || k == null) return;
+          final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
+          final Attachment att = Attachment(
+            id: id,
+            kind: kindAtt,
+            mimeType: mime,
+            remoteUrl: url,
+            createdAt: DateTime.now(),
+            status: AttachmentStatus.uploaded,
+          );
+          final ChatMessage m = ChatMessage(
+            id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+            originalText: '',
+            translatedText: '',
+            isMe: false,
+            time: DateTime.now(),
+            attachments: <Attachment>[att],
+          );
+          state = <ChatMessage>[...state, m];
+          saveMessages();
+          ref.notifyListeners();
+          _notif.showIncomingMessage(
+            title: _sourceLang == 'fr' ? 'Pièce jointe reçue' : '收到附件',
+            body: mime,
+          );
+          unawaited(BadgeService.increment());
+        }
+      });
+    }
     return <ChatMessage>[];
   }
 
@@ -81,6 +156,11 @@ class ChatController extends Notifier<List<ChatMessage>> {
     ref.notifyListeners();
   }
 
+  void clearError() {
+    _lastError = null;
+    ref.notifyListeners();
+  }
+
   void setDirection(String source, String target) {
     _sourceLang = source;
     _targetLang = target;
@@ -95,9 +175,63 @@ class ChatController extends Notifier<List<ChatMessage>> {
   Future<void> clear() async {
     state = <ChatMessage>[];
     await saveMessages();
+    await BadgeService.clear();
   }
 
-  Future<void> send(String text) async {
+  Future<void> pickAndSendAttachment() async {
+    final AttachmentDraft? draft = await _picker.pickImage();
+    if (draft == null) return;
+    final String attId = DateTime.now().microsecondsSinceEpoch.toString();
+    final Attachment pending = Attachment(
+      id: attId,
+      kind: draft.kind,
+      mimeType: draft.mimeType,
+      localPath: draft.sourcePath,
+      createdAt: DateTime.now(),
+      status: AttachmentStatus.uploading,
+    );
+    final ChatMessage msg = ChatMessage(
+      id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+      originalText: '',
+      translatedText: '',
+      isMe: true,
+      time: DateTime.now(),
+      attachments: <Attachment>[pending],
+    );
+    state = <ChatMessage>[...state, msg];
+    ref.notifyListeners();
+
+    // Upload with progress; on completion broadcast URL
+    _uploader.upload(draft).listen((UploadProgress p) async {
+      final List<ChatMessage> updated = state.map((m) {
+        if (m.id != msg.id) return m;
+        final Attachment a = m.attachments.first.copyWith(
+          status: (p.remoteUrl != null) ? AttachmentStatus.uploaded : AttachmentStatus.uploading,
+        );
+        return m.copyWith(attachments: <Attachment>[a]);
+      }).toList(growable: false);
+      state = updated;
+      ref.notifyListeners();
+
+      if (p.remoteUrl != null || p.base64Data != null) {
+        // Broadcast metadata via relay if enabled
+        if (_rt != null && _rt!.enabled) {
+          unawaited(_rt!.send(<String, Object?>{
+            'type': 'attachment',
+            'id': attId,
+            'kind': draft.kind.name,
+            'mime': draft.mimeType,
+            'url': p.remoteUrl,
+            if (p.base64Data != null) 'base64': p.base64Data,
+            'ts': DateTime.now().toIso8601String(),
+          }));
+        }
+        await saveMessages();
+      }
+    });
+  }
+
+  Future<void> send(String text, {bool broadcast = true}) async {
     if (text.trim().isEmpty) return;
     if (_isSending) {
       _pendingTexts.add(text);
@@ -124,6 +258,17 @@ class ChatController extends Notifier<List<ChatMessage>> {
       );
       state = <ChatMessage>[...state, userMsg];
       await saveMessages();
+
+      // Broadcast to relay so the counterpart client receives it
+      if (broadcast && _rt != null && _rt!.enabled) {
+        unawaited(_rt!.send(<String, Object?>{
+          'type': 'text',
+          'text': text,
+          'source_lang': _sourceLang,
+          'target_lang': _targetLang,
+          'ts': DateTime.now().toIso8601String(),
+        }));
+      }
 
       // Appelle la traduction
       final TranslationResult res = await _repo.translate(
@@ -164,6 +309,38 @@ class ChatController extends Notifier<List<ChatMessage>> {
         // Enchaîne le prochain message après un délai pour limiter les 429
         Future<void>.delayed(_postSendDelay, () => send(next));
       }
+    }
+  }
+
+  Future<void> _receiveRemote(String text) async {
+    // Translate incoming text into our local target language
+    // Assume the peer sends in our target language
+    final String src = _targetLang;
+    final String target = _sourceLang;
+    try {
+      final TranslationResult res = await _repo.translate(
+        text: text,
+        sourceLang: src,
+        targetLang: target,
+        tone: _tone,
+        wantPinyin: target == 'zh' ? _wantPinyin : false,
+      );
+
+      final ChatMessage replyMsg = ChatMessage(
+        id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+        originalText: '',
+        translatedText: res.translation,
+        isMe: false,
+        time: DateTime.now(),
+        pinyin: res.pinyin,
+        notes: res.notes,
+      );
+      state = <ChatMessage>[...state, replyMsg];
+      await saveMessages();
+      ref.notifyListeners();
+    } catch (e) {
+      _lastError = e.toString();
+      ref.notifyListeners();
     }
   }
 }

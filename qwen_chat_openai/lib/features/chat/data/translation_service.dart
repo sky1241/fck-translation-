@@ -24,16 +24,16 @@ class TranslationService {
   final String _model;
 
   static const String systemPrompt =
-      'You are a live dialogue translator for FR↔ZH ONLY (French ⇄ Chinese Simplified).\n'
+      'You are a realtime dialogue translator for FR↔ZH ONLY (French ⇄ Chinese Simplified).\n'
       'Never use or output any other language.\n'
       'CRITICAL RULES:\n'
       '1) Translate faithfully, but make target text idiomatic and natural for casual messaging (WeChat/WhatsApp).\n'
       '2) Apply requested TONE (casual/affectionate/business).\n'
       '3) Preserve emojis; avoid vulgarity unless explicitly present.\n'
-      '4) TARGET=Chinese: use Simplified Chinese (zh-Hans). If French is blunt, gently soften with polite mitigations (委婉) while keeping the original intent. Provide pinyin ONLY if requested.\n'
-      '5) TARGET=French: idiomatic, concise, emotionally clear; default tutoiement in romance, vouvoiement in business unless explicitly stated otherwise.\n'
-      '6) Do NOT add facts or change intent; no moralizing/safety boilerplate.\n'
-      '7) OUTPUT STRICT JSON ONLY (no markdown): {"translation": string, "pinyin": string|null, "notes": string|null}.\n'
+      '4) TARGET=Chinese: use Simplified Chinese (zh-Hans). If French is blunt, mitigate politely (委婉) while preserving intent. Provide pinyin ONLY if requested.\n'
+      '5) TARGET=French: idiomatic, concise, emotionally clear; default tutoiement in romance, vouvoiement in business unless stated otherwise.\n'
+      '6) Do NOT add facts or change intent; no safety boilerplate; no Markdown.\n'
+      '7) OUTPUT STRICT JSON ONLY (no markdown): {"translation": string, "pinyin": string|null, "notes": string|null}. If you generate anything else, correct to strict JSON.\n'
       '8) If input contains other languages, treat them as quoted content and translate only the FR↔ZH parts.';
 
   Future<TranslationResult> translate({
@@ -52,7 +52,6 @@ class TranslationService {
       return TranslationResult(
         translation: mockTranslation,
         pinyin: mockPinyin,
-        notes: null,
       );
     }
 
@@ -116,6 +115,7 @@ class TranslationService {
         url,
         headers: <String, String>{
           'Authorization': 'Bearer $_apiKey',
+          if (AppEnv.project.isNotEmpty) 'OpenAI-Project': AppEnv.project,
         },
         body: body,
       );

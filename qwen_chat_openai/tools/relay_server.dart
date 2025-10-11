@@ -23,8 +23,10 @@ Future<void> main(List<String> args) async {
     print('[relay][$room] connected (${roomToSockets[room]!.length})');
 
     socket.listen((dynamic data) {
-      // Broadcast raw text frames to all others in the same room
-      final String text = data is String ? data : utf8.decode(data as List<int>);
+      // Broadcast text frames; if binary arrives, decode with allowMalformed
+      final String text = data is String
+          ? data
+          : utf8.decode(data as List<int>, allowMalformed: true);
       for (final WebSocket s in roomToSockets[room]!.toList()) {
         if (s != socket) {
           s.add(text);
