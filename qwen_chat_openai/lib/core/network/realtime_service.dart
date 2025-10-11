@@ -42,13 +42,23 @@ class RealtimeService {
       } catch (_) {
         // ignore invalid frames
       }
-    }, onDone: _cleanup, onError: (_) => _cleanup());
+    }, onDone: _retry, onError: (_) => _retry());
   }
 
   void _cleanup() {
     _sub?.cancel();
     _sub = null;
     _channel = null;
+  }
+
+  void _retry() {
+    _cleanup();
+    // simple backoff reconnect
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      // ignore: avoid_print
+      print('[relay] reconnecting...');
+      connect();
+    });
   }
 
   Future<void> send(Map<String, Object?> payload) async {

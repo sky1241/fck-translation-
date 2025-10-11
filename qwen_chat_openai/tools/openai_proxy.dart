@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -8,15 +9,29 @@ import 'dart:io';
 //  - OPENAI_PROJECT: if set, adds header OpenAI-Project
 //  - PORT: override listen port (default 8787)
 Future<void> main() async {
-  final int port = int.tryParse(Platform.environment['PORT'] ?? '') ?? 8787;
-  // Bind to all interfaces for cloud hosts (Render/containers)
-  final HttpServer server = await HttpServer.bind(InternetAddress.anyIPv4, port);
-  // print kept for simple container logs; use a logger in production
-  // ignore: avoid_print
-  print('OpenAI proxy listening on http://localhost:$port');
-  await for (HttpRequest req in server) {
-    _handle(req);
-  }
+  runZonedGuarded(() async {
+    final int port = int.tryParse(Platform.environment['PORT'] ?? '') ?? 8787;
+    final HttpServer server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+    // ignore: avoid_print
+    print('OpenAI proxy listening on http://0.0.0.0:$port');
+    await for (HttpRequest req in server) {
+      try {
+        await _handle(req);
+      } catch (e, st) {
+        // ignore: avoid_print
+        print('proxy.handle.error: $e\n$st');
+        try {
+          req.response.statusCode = 502;
+          req.response.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+          req.response.write(jsonEncode({'error': e.toString()}));
+          await req.response.close();
+        } catch (_) {}
+      }
+    }
+  }, (Object error, StackTrace st) {
+    // ignore: avoid_print
+    print('proxy.fatal: $error\n$st');
+  });
 }
 
 Future<void> _handle(HttpRequest req) async {
@@ -45,7 +60,9 @@ Future<void> _handle(HttpRequest req) async {
   try {
     final String body = await utf8.decoder.bind(req).join();
     final Uri url = Uri.parse('https://api.openai.com/v1/chat/completions');
-    final HttpClient client = HttpClient();
+    final HttpClient client = HttpClient()
+      ..idleTimeout = const Duration(seconds: 15)
+      ..connectionTimeout = const Duration(seconds: 15);
     final HttpClientRequest out = await client.postUrl(url);
     // Headers
     final String? serverKey = Platform.environment['OPENAI_SERVER_API_KEY'];
@@ -73,9 +90,12 @@ Future<void> _handle(HttpRequest req) async {
     req.response.write(respBody);
     await req.response.close();
   } catch (e) {
-    req.response.statusCode = 500;
-    req.response.write(jsonEncode({'error': e.toString()}));
-    await req.response.close();
+    try {
+      req.response.statusCode = 502;
+      req.response.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      req.response.write(jsonEncode({'error': e.toString()}));
+      await req.response.close();
+    } catch (_) {}
   }
 }
 

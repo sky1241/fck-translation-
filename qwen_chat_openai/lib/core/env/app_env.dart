@@ -1,7 +1,8 @@
 class AppEnv {
   static const String baseUrl = String.fromEnvironment(
     'OPENAI_BASE_URL',
-    defaultValue: 'https://fck-openai-proxy.onrender.com/v1/chat/completions',
+    // Default to OpenAI directly to avoid proxy cold-start 503
+    defaultValue: 'https://api.openai.com/v1/chat/completions',
   );
   static const String apiKey = String.fromEnvironment('OPENAI_API_KEY');
   static const String model =
