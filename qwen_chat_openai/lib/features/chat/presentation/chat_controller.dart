@@ -92,7 +92,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
             kind: kindAtt,
             mimeType: mime,
             remoteUrl: url,
-            createdAt: DateTime.now(),
+            createdAt: DateTime.now().toUtc(),
             status: AttachmentStatus.uploaded,
           );
           final ChatMessage m = ChatMessage(
@@ -100,7 +100,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
             originalText: '',
             translatedText: '',
             isMe: false,
-            time: DateTime.now(),
+            time: DateTime.now().toUtc(),
             attachments: <Attachment>[att],
           );
           state = <ChatMessage>[...state, m];
@@ -187,7 +187,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
       kind: draft.kind,
       mimeType: draft.mimeType,
       localPath: draft.sourcePath,
-      createdAt: DateTime.now(),
+      createdAt: DateTime.now().toUtc(),
       status: AttachmentStatus.uploading,
     );
     final ChatMessage msg = ChatMessage(
@@ -195,7 +195,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
       originalText: '',
       translatedText: '',
       isMe: true,
-      time: DateTime.now(),
+      time: DateTime.now().toUtc(),
       attachments: <Attachment>[pending],
     );
     state = <ChatMessage>[...state, msg];
@@ -223,7 +223,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
             'mime': draft.mimeType,
             'url': p.remoteUrl,
             if (p.base64Data != null) 'base64': p.base64Data,
-            'ts': DateTime.now().toIso8601String(),
+            'ts': DateTime.now().toUtc().toIso8601String(),
           }));
         }
         await saveMessages();
@@ -254,7 +254,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
         originalText: text,
         translatedText: '',
         isMe: true,
-        time: DateTime.now(),
+        time: DateTime.now().toUtc(),
       );
       state = <ChatMessage>[...state, userMsg];
       await saveMessages();
@@ -266,7 +266,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
           'text': text,
           'source_lang': _sourceLang,
           'target_lang': _targetLang,
-          'ts': DateTime.now().toIso8601String(),
+          'ts': DateTime.now().toUtc().toIso8601String(),
         }));
       }
 
@@ -285,7 +285,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
         originalText: '',
         translatedText: res.translation,
         isMe: false,
-        time: DateTime.now(),
+        time: DateTime.now().toUtc(),
         pinyin: res.pinyin,
         notes: res.notes,
       );
@@ -331,7 +331,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
         originalText: '',
         translatedText: res.translation,
         isMe: false,
-        time: DateTime.now(),
+        time: DateTime.now().toUtc(),
         pinyin: res.pinyin,
         notes: res.notes,
       );

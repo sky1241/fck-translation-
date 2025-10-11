@@ -68,7 +68,7 @@ class Attachment {
       'w': width,
       'h': height,
       'size': sizeBytes,
-      'ts': createdAt.toIso8601String(),
+      'ts': createdAt.toUtc().toIso8601String(),
       'status': status.name,
     };
   }
@@ -84,7 +84,7 @@ class Attachment {
       width: map['w'] as int?,
       height: map['h'] as int?,
       sizeBytes: map['size'] as int?,
-      createdAt: DateTime.parse(map['ts'] as String),
+      createdAt: DateTime.parse(map['ts'] as String).toUtc(),
       status: AttachmentStatus.values.firstWhere((e) => e.name == map['status'], orElse: () => AttachmentStatus.pending),
     );
   }
