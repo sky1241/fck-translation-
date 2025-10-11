@@ -17,7 +17,7 @@ File: `lib/core/env/app_env.dart`
 - File: `lib/core/network/realtime_service.dart` (connects to `RELAY_WS_URL?room=RELAY_ROOM`)
 - LAN test:
   - Phone/PC: `RELAY_WS_URL=ws://PC_IP:8765`
-  - Android emulator (same PC): `RELAY_WS_URL=ws://10.0.2.2:8765`
+  - Android emulator/phone: `RELAY_WS_URL=wss://fck-relay-ws.onrender.com`
 - Release: use a public `wss://` URL and fixed room.
 
 ### Chat logic
@@ -87,7 +87,7 @@ flutter run -d <deviceId> \
   --dart-define=RELAY_WS_URL=ws://PC_IP:8765 \
   --dart-define=RELAY_ROOM=demo123
 ```
-- Emulator (ZH→FR, same PC): use `RELAY_WS_URL=ws://10.0.2.2:8765`
+- Emulator/phone: use `RELAY_WS_URL=wss://fck-relay-ws.onrender.com`
 
 ### Release (fixed liaison)
 - Set: `RELAY_WS_URL=wss://your-relay`, `RELAY_ROOM=your-room`

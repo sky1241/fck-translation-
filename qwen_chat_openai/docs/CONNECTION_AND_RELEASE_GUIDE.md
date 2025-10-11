@@ -7,7 +7,7 @@
 - Both clients must share the same room.
 - Use a reachable RELAY_WS_URL:
   - Phone ↔ PC on same LAN: `ws://PC_IP:8765` (NOT 127.0.0.1 on phone)
-  - Android Studio emulator (same PC as relay): `ws://10.0.2.2:8765`
+  - Emulator/phone (Render relay): `wss://fck-relay-ws.onrender.com`
   - Internet (recommended for “no touch” release): `wss://your-domain:8765`
 
 Required defines (examples):
@@ -30,7 +30,7 @@ Required defines (examples):
 ## Quick test matrix
 - Web (host PC): run with RELAY_WS_URL=`ws://PC_IP:8765` and room `demo123`.
 - Phone: install app; run/build with the same RELAY settings.
-- Emulator: use RELAY_WS_URL=`ws://10.0.2.2:8765` if relay runs on the same PC.
+- Emulator/phone: use RELAY_WS_URL=`wss://fck-relay-ws.onrender.com`.
 
 ## Stable “no-touch” release
 1) Host relay on the internet (wss) with a fixed room.
