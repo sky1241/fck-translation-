@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: fck-openai-proxy
+    env: docker
+    plan: free
+    autoDeploy: true
+    dockerfilePath: Dockerfile.proxy
+    envVars:
+      - key: OPENAI_SERVER_API_KEY
+        value: ""
+      - key: OPENAI_PROJECT
+        value: ""
+
+  - type: web
+    name: fck-relay-ws
+    env: docker
+    plan: free
+    autoDeploy: true
+    dockerfilePath: Dockerfile.relay
+
+

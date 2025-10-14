@@ -24,28 +24,52 @@ class RealtimeService {
   Future<void> connect() async {
     if (!enabled) return;
     if (_channel != null) return;
-    final String effectiveUrl = _url.isNotEmpty
-        ? _url
-        : AppEnv.relayWsUrl;
-    final Uri uri = Uri.parse('$effectiveUrl?room=${Uri.encodeComponent(_room)}');
-    _channel = WebSocketChannel.connect(uri);
-    _sub = _channel!.stream.listen((dynamic data) {
-      // Verbose log for relay frames
+    final String effectiveUrl = _url.isNotEmpty ? _url : AppEnv.relayWsUrl;
+    final Uri base = Uri.parse(effectiveUrl);
+    final Uri uri = Uri(
+      scheme: base.scheme,
+      host: base.host,
+      port: base.hasPort ? base.port : null,
+      path: (base.path.isEmpty) ? '/' : base.path,
+      queryParameters: <String, String>{'room': _room},
+    );
+    try {
       // ignore: avoid_print
-      print('[relay][in] $data');
-      try {
-        final Map<String, dynamic> map = jsonDecode(data as String) as Map<String, dynamic>;
-        _incomingCtrl.add(map);
-      } catch (_) {
-        // ignore invalid frames
-      }
-    }, onDone: _cleanup, onError: (_) => _cleanup());
+      print('[relay] connecting to $uri');
+      _channel = WebSocketChannel.connect(uri);
+      _sub = _channel!.stream.listen((dynamic data) {
+        try {
+          // Decode to text if a binary frame is received; tolerate malformed bytes
+          final String text = (data is String)
+              ? data
+              : utf8.decode(data as List<int>, allowMalformed: true);
+          // ignore: avoid_print
+          print('[relay][in] $text');
+          final Map<String, dynamic> map = jsonDecode(text) as Map<String, dynamic>;
+          _incomingCtrl.add(map);
+        } catch (_) {
+          // ignore invalid frames
+        }
+      }, onDone: _retry, onError: (_) => _retry());
+    } catch (_) {
+      _retry();
+    }
   }
 
   void _cleanup() {
     _sub?.cancel();
     _sub = null;
     _channel = null;
+  }
+
+  void _retry() {
+    _cleanup();
+    // simple backoff reconnect
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      // ignore: avoid_print
+      print('[relay] reconnecting...');
+      connect();
+    });
   }
 
   Future<void> send(Map<String, Object?> payload) async {

@@ -18,7 +18,8 @@ class BadgeService {
     // No-op for now: plugin removed; keep internal counter only
   }
 
-  static bool _canUseBadges() {
+  // Reserved for future native badge integration
+  static bool get canUseBadges {
     if (kIsWeb) return false;
     return Platform.isAndroid || Platform.isIOS;
   }

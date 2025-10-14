@@ -1,4 +1,4 @@
-## Dossier de compétences (session du 2025-10-06)
+## Dossier de compétences (mise à jour 2025-10-14)
 
 Résumé rapide
 - Mise en place d’une app Flutter FR ↔ ZH type messagerie (Android + Web).
@@ -11,15 +11,15 @@ Compétences techniques
 - Architecture Flutter propre: Riverpod (state), Freezed/JSON (modèles), séparation data/domain/presentation.
 - Réseau HTTP résilient: timeouts, retries exponentiels avec jitter, gestion 429/quota.
 - Parsing JSON strict et fallback: extraction du premier objet `{...}` si nécessaire.
-- WebSocket: conception d’un relay minimal (rooms), écoute/broadcast, prévention des boucles d’écho.
+- WebSocket: conception d’un relay minimal (rooms), écoute/broadcast, prévention des boucles d’écho, reconnexion/résilience.
 - Sécurité dev: non-commit des secrets, `.gitignore`, variables d’environnement.
-- Tooling: script PowerShell d’orchestration multi-devices, `adb reverse` (debug), scrcpy, CI GitHub Actions.
+- Tooling: script PowerShell d’orchestration multi-devices, `adb`/AVD, CI GitHub Actions, conformité PSScriptAnalyzer.
 - Badging & notifications: incrément non‑lus, remise à zéro, injection du nombre dans la notification (Android).
-- Realtime paramétrable: RealtimeService (URL/room injectés), guide de connexion LAN/10.0.2.2/wss.
+- Realtime paramétrable: RealtimeService (URL/room injectés), normalisation d’URI, guide de connexion LAN/10.0.2.2/wss.
 - Documentation: rapport journalier, présentation projet, README enrichi.
 
 Compétences méthodologiques
-- Débogage multi-environnements (Windows, Android, navigateur).
+- Débogage multi-environnements (Windows, Android, navigateur/emulateur, Edge).
 - Itérations rapides avec garde-fous (linting, gestion d’erreurs, logs). 
 - Conception de prompts clairs orientés sortie JSON stricte et style conversationnel.
 - Mise en place d’un flux temps réel stable (appairage des directions FR→ZH / ZH→FR).

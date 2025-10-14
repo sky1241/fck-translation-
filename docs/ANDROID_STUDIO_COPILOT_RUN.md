@@ -1,40 +1,30 @@
 ## Lancer en mode réel (Android Studio Copilot)
 
-Pré-requis: Avoir la clé OpenAI en variable d'environnement `OPENAI_API_KEY` (ne pas commiter de secrets).
+Pré‑requis: variables d’environnement `OPENAI_API_KEY` et `OPENAI_PROJECT`. Les URLs stables Render sont déjà intégrées par défaut.
 
-### 1) Démarrer le relais WebSocket (sur le PC)
-
-Terminal PC:
-```bash
-dart run tools/relay_server.dart 8765
+### Téléphone (réel)
+```powershell
+cd "C:\Users\ludov\OneDrive\Bureau\fck trans\fck-translation-\qwen_chat_openai"
+flutter run -d FMMFSOOBXO8T5D75 --no-resident `
+  --dart-define=OPENAI_API_KEY=$env:OPENAI_API_KEY `
+  --dart-define=OPENAI_PROJECT=$env:OPENAI_PROJECT `
+  --dart-define=OPENAI_MODEL=gpt-4o-mini `
+  --dart-define=RELAY_ROOM=demo123
 ```
 
-Note IP: Utiliser l'IP LAN du PC (ex: 192.168.x.y). Sur un émulateur Android du même PC, utiliser `ws://10.0.2.2:8765`.
-
-### 2) Lancer sur téléphone (réel)
-
-Terminal PC (ou Copilot exécute la commande):
-```bash
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/run_phone_real.ps1 `
-  -ApiKey $env:OPENAI_API_KEY `
-  -BaseUrl https://api.openai.com/v1/chat/completions `
-  -RelayUrl ws://192.168.x.y:8765 `
-  -Room demo123
+### Émulateur API 30
+```powershell
+$emu=(adb devices | Select-String "^emulator-" | % { ($_ -split "\s+")[0] } | Select-Object -First 1)
+cd "C:\Users\ludov\OneDrive\Bureau\fck trans\fck-translation-\qwen_chat_openai"
+flutter run -d $emu --device-timeout 180 --no-resident `
+  --dart-define=OPENAI_API_KEY=$env:OPENAI_API_KEY `
+  --dart-define=OPENAI_PROJECT=$env:OPENAI_PROJECT `
+  --dart-define=OPENAI_MODEL=gpt-4o-mini `
+  --dart-define=RELAY_ROOM=demo123
 ```
 
-### 3) Lancer sur émulateur
-
-```bash
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/run_emulator_real.ps1 `
-  -ApiKey $env:OPENAI_API_KEY `
-  -BaseUrl https://api.openai.com/v1/chat/completions `
-  -RelayUrl ws://10.0.2.2:8765 `
-  -Room demo123
-```
-
-### Remarques
-- Aucune UI de réglages n'est exposée dans l'app; tout passe par les `--dart-define`.
-- Le relais n'est requis que pour simuler un chat à deux appareils/émulateurs.
-- Les images locales s'affichent immédiatement; l'upload distant est optionnel.
-
+### Notes
+- Pas besoin de tunnel local: proxy et relay Render sont permanents.
+- Même `RELAY_ROOM` sur les deux appareils.
+- L’AVD API 30 est recommandé (désactiver Wellbeing/QuickSearchBox, animations à 0).
 

@@ -24,6 +24,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     super.initState();
     Future<void>(() async {
       await ref.read(chatControllerProvider.notifier).loadMessages();
+      // Auto-scroll to bottom on first open, after messages are loaded
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_listCtrl.hasClients) {
+          _listCtrl.jumpTo(_listCtrl.position.maxScrollExtent);
+        }
+      });
     });
     // Opening chat clears the unread badge
     Future<void>(() async { await BadgeService.clear(); });

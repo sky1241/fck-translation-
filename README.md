@@ -50,6 +50,30 @@ flutter run \
 ```
 L’app renverra une traduction factice et (si cible=zh) un pinyin mock, permettant de valider l’UI, la file de conversation, le clear et l’autoscroll.
 
+## Tests temps réel en local (sans proxy Render)
+
+- Démarrer le relay WebSocket local:
+```bash
+dart run tools/relay_server.dart 8765
+```
+- Lancer le web (Edge) avec le relay local:
+```bash
+flutter run -d edge -t lib/main.dart \
+  --dart-define=OPENAI_BASE_URL=https://api.openai.com/v1/chat/completions \
+  --dart-define=OPENAI_API_KEY=sk-XXXX \
+  --dart-define=OPENAI_MODEL=gpt-4o-mini \
+  --dart-define=RELAY_WS_URL=ws://127.0.0.1:8765 \
+  --dart-define=RELAY_ROOM=test123
+```
+- Lancer l’émulateur Android (room identique) avec mapping `10.0.2.2`:
+```bash
+pwsh -NoProfile -ExecutionPolicy Bypass -File "docs/PLAYBOOK/COMMANDS.ps1" -target emu -UseLocalRelay -DirectOpenAI
+```
+
+Notes:
+- `127.0.0.1` vu depuis le navigateur (host) ≠ `127.0.0.1` dans l’émulateur; utiliser `10.0.2.2` côté Android pour joindre l’hôte.
+- Si le port 8765 est occupé, tuer le processus ou choisir un autre port.
+
 ## Fonctionnalités
 
 - Traduction FR ⇄ ZH (zh-Hans) directionnelle avec ton (casual/affectionate/business)
