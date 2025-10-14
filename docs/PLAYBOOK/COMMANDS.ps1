@@ -5,7 +5,9 @@ param(
   [ValidateSet('phone','emu','both','health')]
   [string]$target = 'both',
   [switch]$UseLocalRelay,
-  [switch]$DirectOpenAI
+  [switch]$DirectOpenAI,
+  [int]$RelayPort = 8765,
+  [string]$HostLanIp = ''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -37,6 +39,23 @@ function Initialize-AndroidSdkPath {
   return $adbExe
 }
 
+function Get-LocalIPv4 {
+  [CmdletBinding()]
+  param()
+  try {
+    $ip = (Get-NetIPAddress -AddressFamily IPv4 |
+      Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254*' } |
+      Sort-Object -Property InterfaceMetric |
+      Select-Object -First 1 -ExpandProperty IPAddress)
+    if (-not $ip) { throw 'No IPv4 found' }
+    return $ip
+  } catch {
+    $line = (ipconfig | Select-String -Pattern 'IPv4.*:').Line
+    if ($line) { return ($line -split ':\s*')[-1].Trim() }
+    throw 'Unable to detect local IPv4 address.'
+  }
+}
+
 function Start-PhoneRelease {
   [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
   param()
@@ -45,7 +64,10 @@ function Start-PhoneRelease {
   }
   if ($DirectOpenAI) { $script:OPENAI_URL = 'https://api.openai.com/v1/chat/completions' }
   $relayForPhone = $RELAY_URL
-  if ($UseLocalRelay) { $relayForPhone = 'ws://10.0.2.2:8765' }
+  if ($UseLocalRelay) {
+    if (-not $HostLanIp) { $HostLanIp = Get-LocalIPv4 }
+    $relayForPhone = "ws://$($HostLanIp):$($RelayPort)"
+  }
   $flutterArgs = @(
     'run','-d','FMMFSOOBXO8T5D75','--release','--no-resident',
     "--dart-define=OPENAI_BASE_URL=$OPENAI_URL",
@@ -75,7 +97,7 @@ function Start-EmulatorRelease {
   $emu = (& $adb devices | Select-String '^emulator-' | ForEach-Object { ($_ -split '\s+')[0] } | Select-Object -First 1)
   if (-not $emu) { throw 'No emulator detected.' }
   $relayForEmu = $RELAY_URL
-  if ($UseLocalRelay) { $relayForEmu = 'ws://10.0.2.2:8765' }
+  if ($UseLocalRelay) { $relayForEmu = "ws://10.0.2.2:$($RelayPort)" }
   $flutterArgs = @(
     'run','-d',$emu,'--release','--device-timeout','180','--no-resident',
     "--dart-define=OPENAI_BASE_URL=$OPENAI_URL",
