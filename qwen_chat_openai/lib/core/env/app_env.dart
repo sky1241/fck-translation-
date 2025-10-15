@@ -15,9 +15,9 @@ class AppEnv {
   // Accepted values: '' | 'fr2zh' | 'zh2fr'
   static const String defaultDirection =
       String.fromEnvironment('CHAT_DEFAULT_DIRECTION', defaultValue: 'fr2zh');
-  // e.g. 'casual' | 'affectionate' | 'business'
+  // e.g. 'casual' | 'affectionate' | 'intimate'
   static const String defaultTone =
-      String.fromEnvironment('CHAT_DEFAULT_TONE', defaultValue: 'casual');
+      String.fromEnvironment('CHAT_DEFAULT_TONE', defaultValue: 'affectionate');
   static const bool defaultPinyin =
       bool.fromEnvironment('CHAT_DEFAULT_PINYIN', defaultValue: true);
 
