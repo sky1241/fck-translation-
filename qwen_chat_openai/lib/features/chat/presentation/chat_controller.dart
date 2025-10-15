@@ -31,7 +31,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
   late IChatRepository _repo;
   String _sourceLang = 'fr';
   String _targetLang = 'zh';
-  String _tone = 'casual';
+  String _tone = 'affectionate';  // Default to affectionate for couple conversations
   bool _wantPinyin = true;
   bool _isSending = false;
   String? _lastError;

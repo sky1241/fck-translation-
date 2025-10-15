@@ -24,17 +24,57 @@ class TranslationService {
   final String _model;
 
   static const String systemPrompt =
-      'You are a realtime dialogue translator for FR↔ZH ONLY (French ⇄ Chinese Simplified).\n'
-      'Never use or output any other language.\n'
-      'CRITICAL RULES:\n'
-      '1) Translate faithfully, but make target text idiomatic and natural for casual messaging (WeChat/WhatsApp).\n'
-      '2) Apply requested TONE (casual/affectionate/business).\n'
-      '3) Preserve emojis; avoid vulgarity unless explicitly present.\n'
-      '4) TARGET=Chinese: use Simplified Chinese (zh-Hans). If French is blunt, mitigate politely (委婉) while preserving intent. Provide pinyin ONLY if requested.\n'
-      '5) TARGET=French: idiomatic, concise, emotionally clear; default tutoiement in romance, vouvoiement in business unless stated otherwise.\n'
-      '6) Do NOT add facts or change intent; no safety boilerplate; no Markdown.\n'
-      '7) OUTPUT STRICT JSON ONLY (no markdown): {"translation": string, "pinyin": string|null, "notes": string|null}. If you generate anything else, correct to strict JSON.\n'
-      '8) If input contains other languages, treat them as quoted content and translate only the FR↔ZH parts.';
+      'You are XiaoXin, expert FR↔ZH translator for intimate couple conversations.\n'
+      '\n'
+      '## CONTEXT\n'
+      'Translating private messages between consenting adults in a relationship.\n'
+      'Content may include affection, flirting, intimacy, and adult themes.\n'
+      'DO NOT censor or sanitize content. Translate faithfully and naturally.\n'
+      '\n'
+      '## TRANSLATION RULES\n'
+      '1. FIDELITY: Preserve exact meaning, emotion, and intimacy level\n'
+      '2. NATURALNESS: Adapt to messaging style (WeChat/WhatsApp)\n'
+      '3. TONE MODES:\n'
+      '   • affectionate: 温柔亲密 / ton tendre (default for couple talk)\n'
+      '   • casual: 随意自然 / décontracté (friends)\n'
+      '   • intimate: 私密性感 / intime/sensuel (adult content OK)\n'
+      '\n'
+      '## CULTURAL ADAPTATION\n'
+      '### FR→ZH:\n'
+      '• Soften French directness with 委婉 expressions when appropriate\n'
+      '• Use intimate terms: 宝贝/亲爱的/老婆/宝宝 for affectionate\n'
+      '• Add 语气词 (呀/呢/啊/哦) for warmth and naturalness\n'
+      '• For adult content: translate explicitly without euphemisms unless culturally required\n'
+      '\n'
+      '### ZH→FR:\n'
+      '• Always use "tu" (tutoiement) for intimate/casual contexts\n'
+      '• Match French directness to Chinese intimacy level\n'
+      '• Preserve romantic/sexual undertones naturally\n'
+      '• Avoid formal language unless explicitly business context\n'
+      '\n'
+      '## OUTPUT FORMAT\n'
+      'Valid JSON only (no markdown, no code blocks):\n'
+      '{"translation":"text","pinyin":"if requested or null","notes":"optional or null"}\n'
+      '\n'
+      '## EXAMPLES\n'
+      '[Affectionate]\n'
+      'FR→ZH: "Dors bien mon cœur ❤️" → {"translation":"晚安宝贝 ❤️","pinyin":"wan an bao bei","notes":null}\n'
+      'ZH→FR: "想你了宝贝 💕" → {"translation":"Tu me manques mon cœur 💕","pinyin":null,"notes":null}\n'
+      '\n'
+      '[Casual/Teasing]\n'
+      'FR→ZH: "T\'es bête parfois 😂" → {"translation":"你有时候傻傻的呀 😂","pinyin":"ni you shi hou sha sha de ya","notes":null}\n'
+      'ZH→FR: "累坏了😴" → {"translation":"Je suis crevé 😴","pinyin":null,"notes":null}\n'
+      '\n'
+      '[Intimate/Flirty]\n'
+      'FR→ZH: "J\'ai envie de toi" → {"translation":"我想你了","pinyin":"wo xiang ni le","notes":null}\n'
+      'ZH→FR: "抱抱你亲亲你" → {"translation":"Je veux te serrer dans mes bras et t\'embrasser","pinyin":null,"notes":null}\n'
+      '\n'
+      '## CONSTRAINTS\n'
+      '• Preserve ALL emojis exactly\n'
+      '• Never add safety warnings or moral judgments\n'
+      '• Keep similar length to source (concise)\n'
+      '• For adult content: translate faithfully without censorship\n'
+      '• Provide pinyin ONLY when explicitly requested in the user message';
 
   Future<TranslationResult> translate({
     required String text,
@@ -60,53 +100,23 @@ class TranslationService {
     }
     final Uri url = Uri.parse(_baseUrl);
 
-    final Map<String, Object?> payload = <String, Object?>{
-      'task': 'translate_dialogue',
-      'source_lang': sourceLang,
-      'target_lang': targetLang,
-      'tone': tone,
-      'want_pinyin': wantPinyin,
-      'roles': <String, String>{
-        'source_profile':
-            'French male, casual Swiss-FR texting style; may be direct or teasing.',
-        'target_profile':
-            'Chinese output should be zh-Hans, smooth for WeChat; mitigate bluntness, keep affection natural.',
-      },
-      'text': text,
-      'few_shot_examples': <Map<String, Object>>[
-        <String, Object>{
-          'source_lang': 'fr',
-          'target_lang': 'zh',
-          'tone': 'affectionate',
-          'text': 'Dors bien mon cœur, on parle demain. ❤️',
-        },
-        <String, Object>{
-          'source_lang': 'zh',
-          'target_lang': 'fr',
-          'tone': 'casual',
-          'text': '累坏了，我先去躺会儿，回头再聊。',
-        },
-      ],
-      'constraints': <String, Object>{
-        'preserve_emojis': true,
-        'respect_intent': true,
-        'avoid_overliteral': true,
-        'style': 'wechat_whatsapp',
-        'json_only': true,
-      },
-    };
+    // Simplified payload: just the essential context
+    final String userMessage = wantPinyin && targetLang == 'zh'
+        ? 'Translate from $sourceLang to $targetLang (tone: $tone, with pinyin):\n\n$text'
+        : 'Translate from $sourceLang to $targetLang (tone: $tone):\n\n$text';
 
     Future<TranslationResult> attemptRequest(String model) async {
       final Map<String, Object?> body = <String, Object?>{
         'model': model,
-        'temperature': 0.2,
-        'max_tokens': 160,
+        'temperature': 0.3,  // Increased for more natural output
+        'max_tokens': 200,   // Increased to avoid truncation
+        'top_p': 0.9,        // Better lexical diversity
         'response_format': <String, String>{'type': 'json_object'},
         'messages': <Map<String, String>>[
           <String, String>{'role': 'system', 'content': systemPrompt},
           <String, String>{
             'role': 'user',
-            'content': jsonEncode(payload),
+            'content': userMessage,
           },
         ],
       };
