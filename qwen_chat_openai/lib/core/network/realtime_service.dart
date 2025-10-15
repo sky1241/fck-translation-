@@ -27,7 +27,11 @@ class RealtimeService {
     final String effectiveUrl = _url.isNotEmpty
         ? _url
         : AppEnv.relayWsUrl;
+    // ignore: avoid_print
+    print('[relay] _url=$_url, AppEnv.relayWsUrl=${AppEnv.relayWsUrl}, effectiveUrl=$effectiveUrl, room=$_room');
     final Uri uri = Uri.parse('$effectiveUrl?room=${Uri.encodeComponent(_room)}');
+    // ignore: avoid_print
+    print('[relay] connecting to $uri');
     _channel = WebSocketChannel.connect(uri);
     _sub = _channel!.stream.listen((dynamic data) {
       try {
