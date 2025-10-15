@@ -42,6 +42,27 @@ class AppEnv {
       throw StateError('OPENAI_API_KEY manquant. Passez --dart-define.');
     }
   }
+
+  static void printConfig() {
+    // ignore: avoid_print
+    print('[AppEnv] Configuration loaded:');
+    // ignore: avoid_print
+    print('  baseUrl: $baseUrl');
+    // ignore: avoid_print
+    print('  model: $model');
+    // ignore: avoid_print
+    print('  mockMode: $mockMode');
+    // ignore: avoid_print
+    print('  relayWsUrl: $relayWsUrl');
+    // ignore: avoid_print
+    print('  relayRoom: $relayRoom');
+    // ignore: avoid_print
+    print('  defaultDirection: $defaultDirection');
+    // ignore: avoid_print
+    print('  defaultTone: $defaultTone');
+    // ignore: avoid_print
+    print('  defaultPinyin: $defaultPinyin');
+  }
 }
 
 
