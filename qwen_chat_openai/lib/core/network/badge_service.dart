@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+
 class BadgeService {
   BadgeService._();
 
@@ -10,15 +11,14 @@ class BadgeService {
 
   static Future<void> clear() async {
     _unreadCount = 0;
-    // No-op for now: plugin removed; keep internal counter only
+    // Badge cleared via notification count in NotificationService
   }
 
   static Future<void> increment() async {
     _unreadCount = (_unreadCount + 1).clamp(0, 9999);
-    // No-op for now: plugin removed; keep internal counter only
+    // Badge updated via notification count in NotificationService
   }
 
-  // Reserved for future native badge integration
   static bool get canUseBadges {
     if (kIsWeb) return false;
     return Platform.isAndroid || Platform.isIOS;
