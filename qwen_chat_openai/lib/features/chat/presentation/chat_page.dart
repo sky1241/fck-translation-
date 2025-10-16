@@ -19,19 +19,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _listCtrl = ScrollController();
 
-  IconData _getToneIcon(String tone) {
-    switch (tone) {
-      case 'affectionate':
-        return Icons.favorite;
-      case 'intimate':
-        return Icons.favorite_border;
-      case 'casual':
-        return Icons.chat_bubble_outline;
-      default:
-        return Icons.chat;
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -62,46 +49,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       appBar: AppBar(
         title: Text(title),
         actions: <Widget>[
-          // Tone selector
-          PopupMenuButton<String>(
-            tooltip: 'Ton: ${controller.tone}',
-            icon: Icon(_getToneIcon(controller.tone)),
-            onSelected: (String newTone) {
-              controller.setTone(newTone);
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
-                value: 'affectionate',
-                child: Row(
-                  children: [
-                    Icon(Icons.favorite, color: Colors.pink),
-                    SizedBox(width: 8),
-                    Text('Affectueux 💕'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem<String>(
-                value: 'intimate',
-                child: Row(
-                  children: [
-                    Icon(Icons.favorite_border, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Intime 🔥'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem<String>(
-                value: 'casual',
-                child: Row(
-                  children: [
-                    Icon(Icons.chat_bubble_outline, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Text('Décontracté 😊'),
-                  ],
-                ),
-              ),
-            ],
-          ),
           IconButton(
             tooltip: 'Swap',
             onPressed: controller.swapDirection,
