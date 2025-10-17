@@ -7,6 +7,7 @@ import 'widgets/message_bubble.dart';
 import 'widgets/attachment_bubble.dart';
 import '../data/models/attachment.dart';
 import '../../../core/network/badge_service.dart';
+import '../../../core/network/notification_service.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -33,8 +34,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         }
       });
     });
-    // Opening chat clears the unread badge
-    Future<void>(() async { await BadgeService.clear(); });
+    // Opening chat clears the unread badge AND permanent notification
+    Future<void>(() async {
+      await BadgeService.clear();
+      // Clear the permanent notification
+      final notif = NotificationService();
+      await notif.clearSummaryNotification();
+    });
   }
 
   @override
@@ -49,6 +55,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       appBar: AppBar(
         title: Text(title),
         actions: <Widget>[
+          IconButton(
+            tooltip: controller.silentMode ? 'Mode normal' : 'Mode silencieux',
+            onPressed: controller.toggleSilentMode,
+            icon: Icon(controller.silentMode ? Icons.notifications_off : Icons.notifications),
+          ),
           IconButton(
             tooltip: 'Swap',
             onPressed: controller.swapDirection,
