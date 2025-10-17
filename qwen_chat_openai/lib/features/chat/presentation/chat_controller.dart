@@ -35,6 +35,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
   bool _wantPinyin = true;
   bool _isSending = false;
   String? _lastError;
+  bool _silentMode = false;
   final List<String> _pendingTexts = <String>[];
   Duration _postSendDelay = const Duration(milliseconds: 1200);
   RealtimeService? _rt;
@@ -48,6 +49,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
   bool get wantPinyin => _wantPinyin;
   bool get isSending => _isSending;
   String? get lastError => _lastError;
+  bool get silentMode => _silentMode;
 
   @override
   List<ChatMessage> build() {
@@ -62,6 +64,8 @@ class ChatController extends Notifier<List<ChatMessage>> {
     }
     _tone = AppEnv.defaultTone;
     _wantPinyin = AppEnv.defaultPinyin;
+    // Load silent mode preference
+    _loadSilentMode();
     // Connect realtime relay if a room is present; URL may be provided at build or defaulted elsewhere
     if (AppEnv.relayRoom.isNotEmpty) {
       _rt = RealtimeService(url: AppEnv.relayWsUrl, room: AppEnv.relayRoom);
@@ -72,13 +76,18 @@ class ChatController extends Notifier<List<ChatMessage>> {
           final String? text = msg['text'] as String?;
           if (text == null) return;
           _receiveRemote(text);
-          // Notification locale simple (foreground)
-          _notif.showIncomingMessage(
-            title: _sourceLang == 'fr' ? 'Nouveau message (ZH→FR)' : '新消息 (FR→ZH)',
-            body: text,
-          );
-          // Increment badge for unread
+          // Increment badge FIRST (before notification that might fail)
           unawaited(BadgeService.increment());
+          // Notification locale simple (foreground) - may fail, but badge already updated
+          try {
+            _notif.showIncomingMessage(
+              title: _sourceLang == 'fr' ? 'Nouveau message (ZH→FR)' : '新消息 (FR→ZH)',
+              body: text,
+              silent: _silentMode,
+            );
+          } catch (_) {
+            // Ignore notification errors - badge still works
+          }
         } else if (kind == 'attachment') {
           final String? url = msg['url'] as String?;
           final String? id = msg['id'] as String?;
@@ -106,11 +115,18 @@ class ChatController extends Notifier<List<ChatMessage>> {
           state = <ChatMessage>[...state, m];
           saveMessages();
           ref.notifyListeners();
-          _notif.showIncomingMessage(
-            title: _sourceLang == 'fr' ? 'Pièce jointe reçue' : '收到附件',
-            body: mime,
-          );
+          // Increment badge FIRST
           unawaited(BadgeService.increment());
+          // Notification - may fail, but badge already updated
+          try {
+            _notif.showIncomingMessage(
+              title: _sourceLang == 'fr' ? 'Pièce jointe reçue' : '收到附件',
+              body: mime,
+              silent: _silentMode,
+            );
+          } catch (_) {
+            // Ignore notification errors
+          }
         }
       });
     }
@@ -310,6 +326,22 @@ class ChatController extends Notifier<List<ChatMessage>> {
         Future<void>.delayed(_postSendDelay, () => send(next));
       }
     }
+  }
+
+  Future<void> _loadSilentMode() async {
+    final SharedPreferences sp = await SharedPreferences.getInstance();
+    _silentMode = sp.getBool('silent_mode') ?? false;
+  }
+
+  Future<void> _saveSilentMode() async {
+    final SharedPreferences sp = await SharedPreferences.getInstance();
+    await sp.setBool('silent_mode', _silentMode);
+  }
+
+  void toggleSilentMode() {
+    _silentMode = !_silentMode;
+    _saveSilentMode();
+    ref.notifyListeners();
   }
 
   Future<void> _receiveRemote(String text) async {
