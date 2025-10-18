@@ -1,0 +1,104 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter --quiet assemble --no-version-check --depfile C:\Users\ludov\OneDrive\Bureau\fck trans\fck-translation-\qwen_chat_openai\qwen_chat_openai\build\app\intermediates\flutter\release/flutter_build.d --output C:\Users\ludov\OneDrive\Bureau\fck trans\fck-translation-\qwen_chat_openai\qwen_chat_openai\build\app\intermediates\flutter\release -dTargetFile=C:\Users\ludov\OneDrive\Bureau\fck trans\fck-translation-\qwen_chat_openai\qwen_chat_openai\lib\main.dart -dTargetPlatform=android -dBuildMode=release -dTrackWidgetCreation=true --DartDefines=T1BFTkFJX0JBU0VfVVJMPWh0dHBzOi8vYXBpLm9wZW5haS5jb20vdjEvY2hhdC9jb21wbGV0aW9ucw==,T1BFTkFJX0FQSV9LRVk9c2stcHJvai0yTEhnblg4bTJMNVFBUUt4NkxJWE93ZEtfbXdyQnJfVGpONGo4TzNERWgzY2ZnTU9lVWxoN1FNaWJFU0Rvc2loMXl2Nm43VmJZZ1QzQmxia0ZKYndZMFQtR00yS2xZMmlOYXp2Q19iSVNWWVQxd0xFWmJLVGNrOEh0cFo0UnlaM0p3V2V1THVZTmFUZkQxdzkwMFprNVhYbnBTY0E=,T1BFTkFJX1BST0pFQ1Q9cHJval9uQzRpMVZIMEdrVWRXdlUydlJYU2JSWGM=,T1BFTkFJX01PREVMPWdwdC00by1taW5p,UkVMQVlfV1NfVVJMPXdzczovL2Zjay1yZWxheS13cy5vbnJlbmRlci5jb20=,UkVMQVlfUk9PTT10ZXN0MTIz,Q0hBVF9ERUZBVUxUX0RJUkVDVElPTj16aDJmcg==,RkxVVFRFUl9WRVJTSU9OPTMuMzUuNQ==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049YWM0ZTc5OWQyMw==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049ZDNkNDVkY2YyNQ==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My45LjI= -dFlavor= -dAndroidArchs=android-arm64 -dMinSdkVersion=24 android_aot_bundle_release_android-arm64
+
+## exception
+
+StateError: Bad state: Could not determine run package name. Project path "C:\Users\ludov\OneDrive\Bureau\fck trans\fck-translation-\qwen_chat_openai\qwen_chat_openai\" did not occur as package root in package config "C:\Users\ludov\OneDrive\Bureau\fck trans\fck-translation-\qwen_chat_openai\.dart_tool\package_config.json". Please report a reproduction on https://github.com/flutter/flutter/issues/169475.
+
+```
+#0      DartBuild.build (package:flutter_tools/src/build_system/targets/native_assets.dart:47:9)
+<asynchronous suspension>
+#1      _BuildInstance._invokeInternal (package:flutter_tools/src/build_system/build_system.dart:873:9)
+<asynchronous suspension>
+#2      Future.wait.<anonymous closure> (dart:async/future.dart:525:21)
+<asynchronous suspension>
+#3      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:811:32)
+<asynchronous suspension>
+#4      Future.wait.<anonymous closure> (dart:async/future.dart:525:21)
+<asynchronous suspension>
+#5      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:811:32)
+<asynchronous suspension>
+#6      Future.wait.<anonymous closure> (dart:async/future.dart:525:21)
+<asynchronous suspension>
+#7      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:811:32)
+<asynchronous suspension>
+#8      FlutterBuildSystem.build (package:flutter_tools/src/build_system/build_system.dart:631:16)
+<asynchronous suspension>
+#9      AssembleCommand.runCommand (package:flutter_tools/src/commands/assemble.dart:346:32)
+<asynchronous suspension>
+#10     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1581:27)
+<asynchronous suspension>
+#11     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#12     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
+<asynchronous suspension>
+#13     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:503:9)
+<asynchronous suspension>
+#14     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#15     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:438:5)
+<asynchronous suspension>
+#16     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:98:11)
+<asynchronous suspension>
+#17     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#18     main (package:flutter_tools/executable.dart:101:3)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[✓] Flutter (Channel stable, 3.35.5, on Microsoft Windows [version 10.0.19045.6332], locale fr-CH) [24,1s]
+    • Flutter version 3.35.5 on channel stable at C:\flutter
+    • Upstream repository https://github.com/flutter/flutter.git
+    • Framework revision ac4e799d23 (3 weeks ago), 2025-09-26 12:05:09 -0700
+    • Engine revision d3d45dcf25
+    • Dart version 3.9.2
+    • DevTools version 2.48.0
+    • Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop, enable-android, enable-ios, cli-animations, enable-lldb-debugging
+
+[✓] Windows Version (10 Professionnel 64 bits, 22H2, 2009) [134,6s]
+
+[✓] Android toolchain - develop for Android devices (Android SDK version 35.0.1) [73,0s]
+    • Android SDK at C:\Users\ludov\AppData\Local\Android\sdk
+    • Emulator version 36.2.12.0 (build_id 14214601) (CL:N/A)
+    • Platform android-36, build-tools 35.0.1
+    • Java binary at: C:\Program Files\Android\Android Studio\jbr\bin\java
+      This is the JDK bundled with the latest Android Studio installation on this machine.
+      To manually set the JDK path, use: `flutter config --jdk-dir="path/to/jdk"`.
+    • Java version OpenJDK Runtime Environment (build 21.0.8+-14018985-b1038.68)
+    • All Android licenses accepted.
+
+[✗] Chrome - develop for the web (Cannot find Chrome executable at .\Google\Chrome\Application\chrome.exe) [7,3s]
+    ! Cannot find Chrome. Try setting CHROME_EXECUTABLE to a Chrome executable.
+
+[!] Visual Studio - develop Windows apps (Visual Studio Build Tools 2019 16.11.49) [7,2s]
+    • Visual Studio at C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools
+    • Visual Studio Build Tools 2019 version 16.11.36227.6
+    ✗ The current Visual Studio installation is incomplete.
+      Please use Visual Studio Installer to complete the installation or reinstall Visual Studio.
+
+[✓] Android Studio (version 2025.1.4) [151ms]
+    • Android Studio at C:\Program Files\Android\Android Studio
+    • Flutter plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/9212-flutter
+    • Dart plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/6351-dart
+    • Java version OpenJDK Runtime Environment (build 21.0.8+-14018985-b1038.68)
+
+[✓] Connected device (4 available) [15,8s]
+    • 2409BRN2CY (mobile)        • FMMFSOOBXO8T5D75 • android-arm64  • Android 14 (API 34)
+    • sdk gphone x86 64 (mobile) • emulator-5554    • android-x64    • Android 11 (API 30) (emulator)
+    • Windows (desktop)          • windows          • windows-x64    • Microsoft Windows [version 10.0.19045.6332]
+    • Edge (web)                 • edge             • web-javascript • Microsoft Edge 141.0.3537.71
+
+[✓] Network resources [2,1s]
+    • All expected network resources are available.
+
+! Doctor found issues in 2 categories.
+```
