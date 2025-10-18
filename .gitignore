@@ -1,0 +1,44 @@
+# Sensitive files
+.secret_api_key.txt
+*.env
+.env.*
+key.properties
+
+# Build outputs
+build/
+dist/*.apk
+*.apk
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+
+# Android
+android/key.properties
+android/keystore/*.keystore
+android/keystore/*.jks
+android/local.properties
+android/.gradle/
+android/app/build/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+
+# Web
+web/index.html.bak
+
+# Logs
+*.log
+
