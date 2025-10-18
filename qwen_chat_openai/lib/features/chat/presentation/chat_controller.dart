@@ -253,6 +253,19 @@ class ChatController extends Notifier<List<ChatMessage>> {
       _pendingTexts.add(text);
       return;
     }
+    
+    // DÉTECTION AUTOMATIQUE DE LANGUE
+    final String detectedLang = _detectLanguage(text);
+    
+    // Définir automatiquement source et target
+    if (detectedLang == 'zh') {
+      _sourceLang = 'zh';
+      _targetLang = 'fr';
+    } else {
+      _sourceLang = 'fr';
+      _targetLang = 'zh';
+    }
+    
     if (!(_sourceLang == 'fr' && _targetLang == 'zh') &&
         !(_sourceLang == 'zh' && _targetLang == 'fr')) {
       _lastError = 'Langues supportées: FR ⇄ ZH uniquement.';
@@ -264,17 +277,8 @@ class ChatController extends Notifier<List<ChatMessage>> {
     ref.notifyListeners();
 
     try {
-      // Ajoute d'abord le message de l'utilisateur (comme WhatsApp)
-      final ChatMessage userMsg = ChatMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        originalText: text,
-        translatedText: '',
-        isMe: true,
-        time: DateTime.now().toUtc(),
-      );
-      state = <ChatMessage>[...state, userMsg];
-      await saveMessages();
-
+      // NE PAS créer de message utilisateur - afficher seulement la traduction
+      
       // Broadcast to relay so the counterpart client receives it
       if (broadcast && _rt != null && _rt!.enabled) {
         unawaited(_rt!.send(<String, Object?>{
@@ -295,12 +299,12 @@ class ChatController extends Notifier<List<ChatMessage>> {
         wantPinyin: _wantPinyin,
       );
 
-      // Ajoute la bulle de réponse (autre côté)
+      // Crée SEULEMENT le message traduit (1 bulle au lieu de 2)
       final ChatMessage replyMsg = ChatMessage(
-        id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
-        originalText: '',
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        originalText: text, // On garde l'original pour référence mais pas affiché
         translatedText: res.translation,
-        isMe: false,
+        isMe: false, // IMPORTANT : false pour afficher côté destinataire
         time: DateTime.now().toUtc(),
         pinyin: res.pinyin,
         notes: res.notes,
@@ -342,6 +346,15 @@ class ChatController extends Notifier<List<ChatMessage>> {
     _silentMode = !_silentMode;
     _saveSilentMode();
     ref.notifyListeners();
+  }
+
+  String _detectLanguage(String text) {
+    // Détecte si le texte contient des caractères chinois
+    final RegExp chineseRegex = RegExp(r'[\u4e00-\u9fff]');
+    if (chineseRegex.hasMatch(text)) {
+      return 'zh';
+    }
+    return 'fr';
   }
 
   Future<void> _receiveRemote(String text) async {

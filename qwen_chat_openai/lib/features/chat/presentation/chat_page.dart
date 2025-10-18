@@ -19,6 +19,7 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _listCtrl = ScrollController();
+  int _previousMessageCount = 0;
 
   @override
   void initState() {
@@ -41,30 +42,79 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       final notif = NotificationService();
       await notif.clearSummaryNotification();
     });
+    
+    // Auto-scroll listener pour les messages reçus via WebSocket
+    _listCtrl.addListener(() {
+      // Quand scroll atteint le bas (message lu) → clear badge
+      if (_listCtrl.hasClients && 
+          _listCtrl.position.pixels >= _listCtrl.position.maxScrollExtent - 100) {
+        BadgeService.clear();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = ref.watch(chatControllerProvider.notifier);
     final messages = ref.watch(chatControllerProvider);
+    
+    // Auto-scroll quand un nouveau message arrive (envoi ou réception WebSocket)
+    if (messages.length > _previousMessageCount) {
+      _previousMessageCount = messages.length;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_listCtrl.hasClients && mounted) {
+          _listCtrl.animateTo(
+            _listCtrl.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
 
-    final String title =
-        controller.sourceLang == 'fr' ? 'FR → ZH' : 'ZH → FR';
+    // Badge count pour afficher le nombre de messages non lus
+    final badgeCount = ref.watch(badgeCountProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: const Text('XiaoXin'),
         actions: <Widget>[
-          IconButton(
-            tooltip: controller.silentMode ? 'Mode normal' : 'Mode silencieux',
-            onPressed: controller.toggleSilentMode,
-            icon: Icon(controller.silentMode ? Icons.notifications_off : Icons.notifications),
+          // Badge rouge avec compteur de messages non lus
+          Stack(
+            children: [
+              IconButton(
+                tooltip: controller.silentMode ? 'Mode normal' : 'Mode silencieux',
+                onPressed: controller.toggleSilentMode,
+                icon: Icon(controller.silentMode ? Icons.notifications_off : Icons.notifications),
+              ),
+              if (badgeCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '$badgeCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Swap',
-            onPressed: controller.swapDirection,
-            icon: const Icon(Icons.swap_horiz),
-          ),
+          // Bouton swap supprimé - détection automatique de langue
         ],
       ),
       body: Column(
