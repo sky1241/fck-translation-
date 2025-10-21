@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import '../../data/models/attachment.dart';
+import 'base64_image_widget.dart';
 
 class AttachmentBubble extends StatelessWidget {
   const AttachmentBubble({super.key, required this.attachment, required this.isMe, this.time});
@@ -50,21 +51,25 @@ class AttachmentBubble extends StatelessWidget {
     if (attachment.kind == AttachmentKind.image) {
       final String? url = attachment.remoteUrl;
       final String? local = attachment.localPath;
-      final ImageProvider? image =
-          url != null ? NetworkImage(url) : (local != null ? FileImage(File(local)) : null);
+      
       return AspectRatio(
         aspectRatio: (attachment.width != null && attachment.height != null && attachment.height! > 0)
             ? (attachment.width! / attachment.height!)
             : 4 / 3,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: image != null
-              ? Image(image: image, fit: BoxFit.cover)
-              : Container(
-                  color: Colors.black12,
-                  alignment: Alignment.center,
-                  child: Icon(Icons.image, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                ),
+          child: local != null && File(local).existsSync()
+              ? Image.file(File(local), fit: BoxFit.cover)
+              : url != null
+                  ? Base64ImageWidget(
+                      imageSource: url,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      color: Colors.black12,
+                      alignment: Alignment.center,
+                      child: Icon(Icons.image, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
         ),
       );
     }
