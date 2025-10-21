@@ -10,12 +10,15 @@ import '../data/models/translation_result.dart';
 import '../domain/i_chat_repository.dart';
 import '../../../core/env/app_env.dart';
 import '../../../core/network/realtime_service.dart';
+import '../../../core/network/message_queue.dart';
 import '../../../core/network/notification_service.dart';
 import '../../../core/network/badge_service.dart';
 import '../../../core/media/attachment_picker_service.dart';
 import '../data/models/attachment.dart';
 import '../../../core/network/upload/cloud_upload_service.dart';
 import '../../../core/network/upload/upload_service.dart';
+import '../data/models/photo_gallery_item.dart';
+import '../data/photo_repository.dart';
 
 final IChatRepository _defaultRepo = ChatRepository();
 
@@ -39,9 +42,12 @@ class ChatController extends Notifier<List<ChatMessage>> {
   final List<String> _pendingTexts = <String>[];
   Duration _postSendDelay = const Duration(milliseconds: 1200);
   RealtimeService? _rt;
+  final MessageQueue _messageQueue = MessageQueue();
   final NotificationService _notif = NotificationService();
   final AttachmentPickerService _picker = AttachmentPickerService();
   late final UploadService _uploader = CloudUploadService(endpointBase: AppEnv.uploadBaseUrl);
+  final PhotoRepository _photoRepo = PhotoRepository();
+  StreamSubscription<bool>? _connectionSub;
 
   String get sourceLang => _sourceLang;
   String get targetLang => _targetLang;
@@ -66,16 +72,31 @@ class ChatController extends Notifier<List<ChatMessage>> {
     _wantPinyin = AppEnv.defaultPinyin;
     // Load silent mode preference
     _loadSilentMode();
+    // Load message queue
+    _messageQueue.load();
     // Connect realtime relay if a room is present; URL may be provided at build or defaulted elsewhere
     if (AppEnv.relayRoom.isNotEmpty) {
       _rt = RealtimeService(url: AppEnv.relayWsUrl, room: AppEnv.relayRoom);
       _rt!.connect();
+      
+      // Listen to connection status changes
+      _connectionSub = _rt!.connectionStatus.listen((bool isConnected) {
+        if (isConnected) {
+          print('[ChatController] ✅ Connected - processing queue...');
+          _processQueue();
+        } else {
+          print('[ChatController] 🔴 Disconnected');
+        }
+      });
+      
       _rt!.messages.listen((Map<String, dynamic> msg) {
         final String? kind = msg['type'] as String?;
         if (kind == 'text') {
           final String? text = msg['text'] as String?;
+          final String? srcLang = msg['source_lang'] as String?;
+          final String? tgtLang = msg['target_lang'] as String?;
           if (text == null) return;
-          _receiveRemote(text);
+          _receiveRemote(text, sourceLang: srcLang, targetLang: tgtLang);
           // Increment badge FIRST (before notification that might fail)
           unawaited(BadgeService.increment());
           // Notification locale simple (foreground) - may fail, but badge already updated
@@ -93,14 +114,21 @@ class ChatController extends Notifier<List<ChatMessage>> {
           final String? id = msg['id'] as String?;
           final String? mime = msg['mime'] as String?;
           final String? k = msg['kind'] as String?; // image|video
-          // Base64 relay is supported but optional; we ignore it client-side here
-          if (url == null || id == null || mime == null || k == null) return;
+          final String? base64Data = msg['base64'] as String?;
+          
+          // ✅ Accepter soit url soit base64
+          if (id == null || mime == null || k == null) return;
+          if (url == null && base64Data == null) return;
+          
+          // Utiliser base64 comme data URI si pas d'URL cloud
+          final String effectiveUrl = url ?? base64Data!;
+          
           final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
           final Attachment att = Attachment(
             id: id,
             kind: kindAtt,
             mimeType: mime,
-            remoteUrl: url,
+            remoteUrl: effectiveUrl,
             createdAt: DateTime.now().toUtc(),
             status: AttachmentStatus.uploaded,
           );
@@ -114,7 +142,28 @@ class ChatController extends Notifier<List<ChatMessage>> {
           );
           state = <ChatMessage>[...state, m];
           saveMessages();
+          
+          // ✅ Sauvegarder dans la galerie photo (photos REÇUES)
+          if (kindAtt == AttachmentKind.image) {
+            try {
+              // Use unawaited since we're in a listener (not async)
+              unawaited(_photoRepo.savePhoto(PhotoGalleryItem(
+                id: id,
+                url: effectiveUrl,
+                timestamp: DateTime.now().toUtc(),
+                isFromMe: false, // Photo reçue
+                status: PhotoStatus.remote,
+              )));
+              // ignore: avoid_print
+              print('[ChatController] Photo REÇUE saved to gallery: $id (base64=${base64Data != null})');
+            } catch (e) {
+              // ignore: avoid_print
+              print('[ChatController] Error saving RECEIVED photo to gallery: $e');
+            }
+          }
+          
           ref.notifyListeners();
+          
           // Increment badge FIRST
           unawaited(BadgeService.increment());
           // Notification - may fail, but badge already updated
@@ -232,7 +281,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
       if (p.remoteUrl != null || p.base64Data != null) {
         // Broadcast metadata via relay if enabled
         if (_rt != null && _rt!.enabled) {
-          unawaited(_rt!.send(<String, Object?>{
+          unawaited(_sendOrQueue(<String, Object?>{
             'type': 'attachment',
             'id': attId,
             'kind': draft.kind.name,
@@ -243,6 +292,25 @@ class ChatController extends Notifier<List<ChatMessage>> {
           }));
         }
         await saveMessages();
+        
+        // ✅ Sauvegarder dans la galerie photo (même sans URL cloud)
+        if (draft.kind == AttachmentKind.image) {
+          try {
+            await _photoRepo.savePhoto(PhotoGalleryItem(
+              id: attId,
+              url: p.remoteUrl ?? draft.sourcePath ?? 'file://local',
+              localPath: draft.sourcePath,
+              timestamp: DateTime.now().toUtc(),
+              isFromMe: true,
+              status: PhotoStatus.cached,
+            ));
+            // ignore: avoid_print
+            print('[ChatController] Photo saved to gallery: $attId (url=${p.remoteUrl ?? "local"})');
+          } catch (e) {
+            // ignore: avoid_print
+            print('[ChatController] Error saving photo to gallery: $e');
+          }
+        }
       }
     });
   }
@@ -276,8 +344,9 @@ class ChatController extends Notifier<List<ChatMessage>> {
       await saveMessages();
 
       // Broadcast to relay so the counterpart client receives it
+      // L'autre device va recevoir et traduire de son côté
       if (broadcast && _rt != null && _rt!.enabled) {
-        unawaited(_rt!.send(<String, Object?>{
+        unawaited(_sendOrQueue(<String, Object?>{
           'type': 'text',
           'text': text,
           'source_lang': _sourceLang,
@@ -286,27 +355,8 @@ class ChatController extends Notifier<List<ChatMessage>> {
         }));
       }
 
-      // Appelle la traduction
-      final TranslationResult res = await _repo.translate(
-        text: text,
-        sourceLang: _sourceLang,
-        targetLang: _targetLang,
-        tone: _tone,
-        wantPinyin: _wantPinyin,
-      );
-
-      // Ajoute la bulle de réponse (autre côté)
-      final ChatMessage replyMsg = ChatMessage(
-        id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
-        originalText: '',
-        translatedText: res.translation,
-        isMe: false,
-        time: DateTime.now().toUtc(),
-        pinyin: res.pinyin,
-        notes: res.notes,
-      );
-      state = <ChatMessage>[...state, replyMsg];
-      await saveMessages();
+      // ✅ PAS de traduction locale - c'est l'autre device qui traduit !
+      // On garde UNIQUEMENT notre message dans notre langue (userMsg déjà ajouté ci-dessus)
     } catch (e) {
       final String msg = e.toString();
       if (msg.contains('429') || msg.toLowerCase().contains('quota')) {
@@ -344,18 +394,39 @@ class ChatController extends Notifier<List<ChatMessage>> {
     ref.notifyListeners();
   }
 
-  Future<void> _receiveRemote(String text) async {
-    // Translate incoming text into our local target language
-    // Assume the peer sends in our target language
-    final String src = _targetLang;
-    final String target = _sourceLang;
+  Future<void> _receiveRemote(String text, {String? sourceLang, String? targetLang}) async {
+    // SIMPLE MODE: Always translate to MY language (_sourceLang)
+    // Detect the language of the received text automatically
+    
+    final String myLanguage = _sourceLang;
+    
+    // Auto-detect text language (if has Chinese characters → Chinese, else French)
+    final RegExp chineseRegex = RegExp(r'[\u4e00-\u9fff]');
+    final String textLanguage = chineseRegex.hasMatch(text) ? 'zh' : 'fr';
+    
+    // If the text is already in our language, display it directly
+    if (textLanguage == myLanguage) {
+      final ChatMessage replyMsg = ChatMessage(
+        id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+        originalText: '',
+        translatedText: text,
+        isMe: false,
+        time: DateTime.now().toUtc(),
+      );
+      state = <ChatMessage>[...state, replyMsg];
+      await saveMessages();
+      ref.notifyListeners();
+      return;
+    }
+    
+    // Otherwise, translate the text to our language
     try {
       final TranslationResult res = await _repo.translate(
         text: text,
-        sourceLang: src,
-        targetLang: target,
+        sourceLang: textLanguage,
+        targetLang: myLanguage,
         tone: _tone,
-        wantPinyin: target == 'zh' ? _wantPinyin : false,
+        wantPinyin: myLanguage == 'zh' ? _wantPinyin : false,
       );
 
       final ChatMessage replyMsg = ChatMessage(
@@ -374,6 +445,67 @@ class ChatController extends Notifier<List<ChatMessage>> {
       _lastError = e.toString();
       ref.notifyListeners();
     }
+  }
+
+  /// Envoyer un message ou le mettre en queue si pas de connexion
+  /// STRATÉGIE: Toujours mettre en queue PUIS essayer d'envoyer
+  /// Si succès → enlever de la queue
+  /// Si échec → reste en queue pour retry automatique
+  Future<void> _sendOrQueue(Map<String, Object?> message) async {
+    if (_rt == null || !_rt!.enabled) return;
+    
+    // 1. TOUJOURS mettre en queue d'abord (sécurité)
+    final String queuedId = await _messageQueue.enqueue(message);
+    print('[ChatController] 📝 Message queued (ID: $queuedId, ${_messageQueue.currentSize} pending)');
+    
+    // 2. Essayer d'envoyer immédiatement
+    final bool sent = await _rt!.send(message);
+    
+    if (sent) {
+      // Succès → enlever CE message spécifique de la queue
+      await _messageQueue.remove(queuedId);
+      print('[ChatController] ✅ Message $queuedId sent & removed from queue');
+    } else {
+      // Échec → reste en queue pour retry
+      print('[ChatController] ❌ Message $queuedId failed, staying in queue for retry');
+    }
+  }
+
+  /// Traiter la queue des messages en attente
+  Future<void> _processQueue() async {
+    final messages = _messageQueue.getAll();
+    
+    if (messages.isEmpty) {
+      print('[ChatController] Queue empty');
+      return;
+    }
+    
+    print('[ChatController] Processing ${messages.length} queued messages...');
+    
+    for (final queuedMsg in messages) {
+      // Retry limit
+      if (queuedMsg.retryCount > 5) {
+        print('[ChatController] Message ${queuedMsg.id} exceeded retry limit, removing');
+        await _messageQueue.remove(queuedMsg.id);
+        continue;
+      }
+      
+      // Try to send
+      final bool sent = await _rt!.send(queuedMsg.message);
+      
+      if (sent) {
+        print('[ChatController] ✅ Message ${queuedMsg.id} sent');
+        await _messageQueue.remove(queuedMsg.id);
+      } else {
+        print('[ChatController] ❌ Message ${queuedMsg.id} failed, retry later');
+        await _messageQueue.incrementRetry(queuedMsg.id);
+      }
+      
+      // Small delay between messages
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+    
+    print('[ChatController] Queue processed (${_messageQueue.currentSize} remaining)');
   }
 }
 

@@ -8,6 +8,8 @@ import 'widgets/attachment_bubble.dart';
 import '../data/models/attachment.dart';
 import '../../../core/network/badge_service.dart';
 import '../../../core/network/notification_service.dart';
+import '../../../core/env/app_env.dart';
+import 'photo_gallery_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -48,18 +50,60 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final controller = ref.watch(chatControllerProvider.notifier);
     final messages = ref.watch(chatControllerProvider);
 
-    final String title =
-        controller.sourceLang == 'fr' ? 'FR → ZH' : 'ZH → FR';
+    final String title = 'XiaoXin ${AppEnv.appVersion}';
 
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
         actions: <Widget>[
-          IconButton(
-            tooltip: controller.silentMode ? 'Mode normal' : 'Mode silencieux',
-            onPressed: controller.toggleSilentMode,
-            icon: Icon(controller.silentMode ? Icons.notifications_off : Icons.notifications),
+          // Bouton Galerie Photo (Cœur surélevé)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.pink.shade400,
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<Widget>(builder: (_) => const PhotoGalleryPage()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    Icons.favorite,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
           ),
+          // Bouton Notifications (Cloche surélevée)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(12),
+              color: controller.silentMode ? Colors.grey.shade600 : Colors.teal.shade400,
+              child: InkWell(
+                onTap: controller.toggleSilentMode,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    controller.silentMode ? Icons.notifications_off : Icons.notifications,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Bouton Swap (standard)
           IconButton(
             tooltip: 'Swap',
             onPressed: controller.swapDirection,
