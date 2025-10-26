@@ -1,3 +1,5 @@
+// BUILD TIMESTAMP: 2025-10-24 08:45:00 - FIX PHOTOS GRISES + BASE64 PRIORITÉ
+// Cette modification FORCE Flutter à recompiler ce fichier
 import 'dart:convert';
 import 'dart:async';
 
@@ -56,6 +58,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
   bool get isSending => _isSending;
   String? get lastError => _lastError;
   bool get silentMode => _silentMode;
+  bool get isConnected => _rt?.isConnected ?? false;
 
   @override
   List<ChatMessage> build() {
@@ -87,6 +90,8 @@ class ChatController extends Notifier<List<ChatMessage>> {
         } else {
           print('[ChatController] 🔴 Disconnected');
         }
+        // Notifier l'UI du changement de statut de connexion
+        ref.notifyListeners();
       });
       
       _rt!.messages.listen((Map<String, dynamic> msg) {
@@ -296,16 +301,20 @@ class ChatController extends Notifier<List<ChatMessage>> {
         // ✅ Sauvegarder dans la galerie photo (même sans URL cloud)
         if (draft.kind == AttachmentKind.image) {
           try {
+            // PRIORITÉ : base64 > remoteUrl > localPath
+            // Car le localPath peut ne plus être accessible plus tard
+            final String photoUrl = p.base64Data ?? p.remoteUrl ?? draft.sourcePath ?? 'file://local';
+            
             await _photoRepo.savePhoto(PhotoGalleryItem(
               id: attId,
-              url: p.remoteUrl ?? draft.sourcePath ?? 'file://local',
+              url: photoUrl,
               localPath: draft.sourcePath,
               timestamp: DateTime.now().toUtc(),
               isFromMe: true,
               status: PhotoStatus.cached,
             ));
             // ignore: avoid_print
-            print('[ChatController] Photo saved to gallery: $attId (url=${p.remoteUrl ?? "local"})');
+            print('[ChatController] Photo saved to gallery: $attId (url=${p.base64Data != null ? "base64" : p.remoteUrl ?? "local"})');
           } catch (e) {
             // ignore: avoid_print
             print('[ChatController] Error saving photo to gallery: $e');
@@ -508,5 +517,4 @@ class ChatController extends Notifier<List<ChatMessage>> {
     print('[ChatController] Queue processed (${_messageQueue.currentSize} remaining)');
   }
 }
-
 

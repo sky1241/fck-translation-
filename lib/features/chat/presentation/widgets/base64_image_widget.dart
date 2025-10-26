@@ -1,3 +1,4 @@
+// BUILD 2025-10-25 FIX FINAL - gaplessPlayback + filterQuality + logs détaillés
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -19,36 +20,59 @@ class Base64ImageWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('[Base64ImageWidget] build() - imageSource length: ${imageSource.length}');
+    print('[Base64ImageWidget] imageSource starts with: ${imageSource.substring(0, imageSource.length > 50 ? 50 : imageSource.length)}');
+    
     // Vérifier si c'est du base64
     if (imageSource.startsWith('data:image')) {
       try {
+        print('[Base64ImageWidget] Detected base64 data');
         // Extraire les données base64
-        final base64Data = imageSource.split(',').last;
+        final parts = imageSource.split(',');
+        if (parts.length < 2) {
+          print('[Base64ImageWidget] ERROR: Invalid base64 format (no comma)');
+          return _buildErrorWidget('Format base64 invalide');
+        }
+        
+        final base64Data = parts.last;
+        print('[Base64ImageWidget] Base64 data length: ${base64Data.length}');
+        
         final Uint8List bytes = base64Decode(base64Data);
+        print('[Base64ImageWidget] ✅ Decoded ${bytes.length} bytes');
         
         return Image.memory(
           bytes,
           fit: fit,
           width: width,
           height: height,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.high,
           errorBuilder: (context, error, stackTrace) {
-            print('[Base64ImageWidget] Error decoding base64: $error');
-            return _buildErrorWidget();
+            print('[Base64ImageWidget] ❌ Image.memory error: $error');
+            print('[Base64ImageWidget] ❌ First 100 bytes: ${bytes.take(100).toList()}');
+            print('[Base64ImageWidget] Stack: $stackTrace');
+            return _buildErrorWidget('Erreur affichage: $error');
           },
         );
-      } catch (e) {
-        print('[Base64ImageWidget] Failed to decode base64: $e');
-        return _buildErrorWidget();
+      } catch (e, stack) {
+        print('[Base64ImageWidget] ❌ Failed to decode base64: $e');
+        print('[Base64ImageWidget] Stack: $stack');
+        return _buildErrorWidget('Décodage échoué: $e');
       }
-    } else {
+    } else if (imageSource.startsWith('http://') || imageSource.startsWith('https://')) {
       // URL normale
+      print('[Base64ImageWidget] Using network URL');
       return Image.network(
         imageSource,
         fit: fit,
         width: width,
         height: height,
         loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
+          if (loadingProgress == null) {
+            print('[Base64ImageWidget] ✅ Image loaded from network');
+            return child;
+          }
+          print('[Base64ImageWidget] Loading... ${loadingProgress.cumulativeBytesLoaded} / ${loadingProgress.expectedTotalBytes ?? "?"}');
           return Center(
             child: CircularProgressIndicator(
               value: loadingProgress.expectedTotalBytes != null
@@ -58,22 +82,45 @@ class Base64ImageWidget extends StatelessWidget {
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          print('[Base64ImageWidget] Error loading image: $error');
-          return _buildErrorWidget();
+          print('[Base64ImageWidget] ❌ Network error: $error');
+          return _buildErrorWidget('Erreur réseau: $error');
         },
       );
+    } else {
+      // Source inconnue
+      print('[Base64ImageWidget] ⚠️ Unknown image source type: $imageSource');
+      return _buildErrorWidget('Type source inconnu');
     }
   }
 
-  Widget _buildErrorWidget() {
+  Widget _buildErrorWidget([String? message]) {
     return Container(
       width: width,
       height: height,
-      color: Colors.grey[300],
-      child: const Icon(
-        Icons.broken_image,
-        color: Colors.grey,
-        size: 48,
+      color: Colors.red[100],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.broken_image,
+            color: Colors.red,
+            size: 48,
+          ),
+          if (message != null) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
