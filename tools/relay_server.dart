@@ -2,35 +2,55 @@ import 'dart:convert';
 import 'dart:io';
 
 // WebSocket relay with rooms + MESSAGE HISTORY (like WhatsApp)
-// Messages are stored for 24 hours and sent on reconnection
+// Messages: 2000 max, 5 days retention
+// Photos: NEVER deleted
 
 class StoredMessage {
   final String id;
   final String text;
   final DateTime timestamp;
+  final bool isPhoto;
   
-  StoredMessage({required this.id, required this.text, required this.timestamp});
+  StoredMessage({
+    required this.id, 
+    required this.text, 
+    required this.timestamp,
+    this.isPhoto = false,
+  });
 }
 
 Future<void> main(List<String> args) async {
   final int port = int.parse(Platform.environment['RELAY_PORT'] ?? (args.isNotEmpty ? args.first : '8765'));
   final HttpServer server = await HttpServer.bind(InternetAddress.anyIPv4, port);
   // ignore: avoid_print
-  print('Relay listening on ws://0.0.0.0:$port (WITH MESSAGE HISTORY)');
+  print('Relay listening on ws://0.0.0.0:$port (MSG HISTORY: 2000 msgs, 5 days, Photos NEVER deleted)');
 
   final Map<String, Set<WebSocket>> roomToSockets = <String, Set<WebSocket>>{};
   final Map<String, List<StoredMessage>> roomToMessages = <String, List<StoredMessage>>{};
   
   // Nettoyer les vieux messages toutes les heures
   Timer.periodic(Duration(hours: 1), (_) {
-    final DateTime cutoff = DateTime.now().subtract(Duration(hours: 24));
+    final DateTime cutoff = DateTime.now().subtract(Duration(days: 5));
+    int cleaned = 0;
+    
     for (final String room in roomToMessages.keys.toList()) {
-      roomToMessages[room]!.removeWhere((msg) => msg.timestamp.isBefore(cutoff));
+      final int before = roomToMessages[room]!.length;
+      
+      // ⚠️ NE JAMAIS effacer les photos !
+      roomToMessages[room]!.removeWhere((msg) => 
+        !msg.isPhoto && msg.timestamp.isBefore(cutoff)
+      );
+      
+      cleaned += (before - roomToMessages[room]!.length);
+      
       if (roomToMessages[room]!.isEmpty) {
         roomToMessages.remove(room);
       }
     }
-    print('[relay] Cleaned old messages');
+    
+    if (cleaned > 0) {
+      print('[relay] Cleaned $cleaned old text messages (photos kept forever)');
+    }
   });
 
   await for (HttpRequest req in server) {
@@ -86,23 +106,39 @@ Future<void> main(List<String> args) async {
           final String msgId = parsed['id'] as String? ?? 
                                '${DateTime.now().microsecondsSinceEpoch}';
           
+          // Détecter si c'est une photo
+          final bool isPhoto = msgType == 'photo' || 
+                              msgType == 'image' || 
+                              (parsed['attachments'] as List?)?.isNotEmpty == true ||
+                              parsed['base64'] != null;
+          
           roomToMessages[room]!.add(StoredMessage(
             id: msgId,
             text: text,
             timestamp: DateTime.now(),
+            isPhoto: isPhoto,
           ));
           
-          // Garder maximum 100 messages par room
-          if (roomToMessages[room]!.length > 100) {
-            roomToMessages[room]!.removeAt(0);
+          // Garder maximum 2000 messages par room (messages texte seulement)
+          // Les photos ne comptent pas dans la limite et ne sont JAMAIS effacées
+          final int textMsgCount = roomToMessages[room]!.where((m) => !m.isPhoto).length;
+          if (textMsgCount > 2000) {
+            // Trouver et supprimer le plus ancien message TEXTE (pas photo)
+            for (int i = 0; i < roomToMessages[room]!.length; i++) {
+              if (!roomToMessages[room]![i].isPhoto) {
+                roomToMessages[room]!.removeAt(i);
+                break;
+              }
+            }
           }
         }
       } catch (_) {
-        // Si pas du JSON valide, on stocke quand même
+        // Si pas du JSON valide, on stocke quand même (comme texte)
         roomToMessages[room]!.add(StoredMessage(
           id: '${DateTime.now().microsecondsSinceEpoch}',
           text: text,
           timestamp: DateTime.now(),
+          isPhoto: false,
         ));
       }
       
