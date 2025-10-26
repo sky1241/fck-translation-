@@ -12,7 +12,7 @@ import '../../../core/env/app_env.dart';
 import 'photo_gallery_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
-  const ChatPage({super.key});
+  ChatPage({super.key});
 
   @override
   ConsumerState<ChatPage> createState() => _ChatPageState();
@@ -49,12 +49,32 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Widget build(BuildContext context) {
     final controller = ref.watch(chatControllerProvider.notifier);
     final messages = ref.watch(chatControllerProvider);
+    
+    // Surveiller le statut de connexion
+    final isConnected = controller.isConnected;
+    print('[ChatPage] BUILD - isConnected=$isConnected');
 
     final String title = 'XiaoXin ${AppEnv.appVersion}';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title),
+            const SizedBox(width: 8),
+            // Indicateur de connexion au serveur
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: isConnected ? Colors.green : Colors.red,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+            ),
+          ],
+        ),
         actions: <Widget>[
           // Bouton Galerie Photo (Cœur surélevé)
           Padding(
@@ -103,11 +123,36 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
             ),
           ),
-          // Bouton Swap (standard)
-          IconButton(
-            tooltip: 'Swap',
-            onPressed: controller.swapDirection,
-            icon: const Icon(Icons.swap_horiz),
+          // Indicateur de connexion (GROS bouton vert/rouge)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(12),
+              color: isConnected ? Colors.green.shade600 : Colors.red.shade600,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isConnected ? Icons.check_circle : Icons.error,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isConnected ? 'EN LIGNE' : 'HORS LIGNE',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -126,6 +171,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   child: const Text('OK'),
                 ),
               ],
+            ),
+          // Banderole de reconnexion quand hors ligne
+          if (!isConnected)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              color: Colors.orange.shade100,
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Hors ligne - Envoyez un message pour vous reconnecter',
+                      style: TextStyle(
+                        color: Colors.orange.shade900,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           const SizedBox(height: 8),
           Expanded(
@@ -180,5 +248,3 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 }
-
-

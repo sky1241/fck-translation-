@@ -1,10 +1,13 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:photo_view/photo_view_gallery.dart';
 
 import 'photo_gallery_controller.dart';
 import 'widgets/photo_grid.dart';
-import 'widgets/photo_viewer.dart';
 import '../data/models/photo_gallery_item.dart';
 
 class PhotoGalleryPage extends ConsumerStatefulWidget {
@@ -165,15 +168,8 @@ class _PhotoGalleryPageState extends ConsumerState<PhotoGalleryPage> {
               PhotoGrid(
                 photos: photos,
                 onPhotoTap: (photo) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => PhotoViewer(
-                        initialPhotoId: photo.id,
-                        allPhotos: state.photos,
-                      ),
-                    ),
-                  );
+                  final initialIndex = state.photos.indexWhere((p) => p.id == photo.id);
+                  _showPhotoViewer(context, state.photos, initialIndex >= 0 ? initialIndex : 0);
                 },
               ),
             ],
@@ -216,6 +212,108 @@ class _PhotoGalleryPageState extends ConsumerState<PhotoGalleryPage> {
     } else {
       return DateFormat('d MMMM yyyy', 'fr').format(date);
     }
+  }
+
+  /// Afficher le viewer plein écran avec le package photo_view
+  void _showPhotoViewer(BuildContext context, List<PhotoGalleryItem> photos, int initialIndex) {
+    print('[PhotoGalleryPage] 🖼️ Opening PhotoViewGallery with ${photos.length} photos, index $initialIndex');
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: Text('${initialIndex + 1} / ${photos.length}'),
+          ),
+          body: PhotoViewGallery.builder(
+            itemCount: photos.length,
+            pageController: PageController(initialPage: initialIndex),
+            builder: (context, index) {
+              final photo = photos[index];
+              print('[PhotoViewGallery] 📸 Building item $index - photo ${photo.id}');
+              print('[PhotoViewGallery] 🔍 photo.url length: ${photo.url.length} chars');
+              print('[PhotoViewGallery] 🔍 photo.url starts with: ${photo.url.substring(0, photo.url.length > 50 ? 50 : photo.url.length)}');
+              print('[PhotoViewGallery] 🔍 photo.thumbnail: ${photo.thumbnail != null ? "exists (${photo.thumbnail!.length} chars)" : "null"}');
+              
+              // Priorité : url (base64 JPEG) > thumbnail
+              final String imageSource = photo.url.isNotEmpty ? photo.url : (photo.thumbnail ?? '');
+              
+              // Décoder le base64 JPEG
+              Uint8List? imageBytes;
+              if (imageSource.startsWith('data:image/')) {
+                try {
+                  final base64Data = imageSource.split(',').last;
+                  imageBytes = base64Decode(base64Data);
+                  print('[PhotoViewGallery] ✅ Decoded ${imageBytes.length} bytes for photo $index');
+                } catch (e) {
+                  print('[PhotoViewGallery] ❌ Failed to decode base64: $e');
+                }
+              } else {
+                print('[PhotoViewGallery] ⚠️ imageSource does not start with data:image/ : $imageSource');
+              }
+              
+              // Fallback : icon si pas d'image
+              if (imageBytes == null) {
+                print('[PhotoViewGallery] ⚠️ No valid image bytes, showing error icon');
+                return PhotoViewGalleryPageOptions.customChild(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.broken_image, size: 100, color: Colors.white54),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Image non disponible\n${photo.id}',
+                          style: const TextStyle(color: Colors.white70),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                  minScale: PhotoViewComputedScale.contained,
+                  maxScale: PhotoViewComputedScale.covered * 2,
+                  heroAttributes: PhotoViewHeroAttributes(tag: photo.id),
+                );
+              }
+              
+              return PhotoViewGalleryPageOptions(
+                imageProvider: MemoryImage(imageBytes),
+                minScale: PhotoViewComputedScale.contained,
+                maxScale: PhotoViewComputedScale.covered * 2,
+                heroAttributes: PhotoViewHeroAttributes(tag: photo.id),
+                errorBuilder: (context, error, stackTrace) {
+                  print('[PhotoViewGallery] ❌ MemoryImage error: $error');
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 100, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Erreur d\'affichage\n$error',
+                          style: const TextStyle(color: Colors.white70),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+            scrollPhysics: const BouncingScrollPhysics(),
+            backgroundDecoration: const BoxDecoration(color: Colors.black),
+            loadingBuilder: (context, event) {
+              return const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   /// Afficher la confirmation de suppression
