@@ -63,97 +63,30 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           children: [
             Text(title),
             const SizedBox(width: 8),
-            // Indicateur de connexion au serveur
+            // Point vert/rouge + status texte
             Container(
-              width: 16,
-              height: 16,
+              width: 12,
+              height: 12,
               decoration: BoxDecoration(
                 color: isConnected ? Colors.green : Colors.red,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isConnected ? 'online' : 'offline',
+              style: TextStyle(
+                fontSize: 10,
+                color: isConnected ? Colors.green.shade300 : Colors.red.shade300,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ),
         actions: <Widget>[
-          // Bouton Galerie Photo (Cœur surélevé)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-            child: Material(
-              elevation: 4,
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.pink.shade400,
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute<Widget>(builder: (_) => const PhotoGalleryPage()),
-                  );
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  child: const Icon(
-                    Icons.favorite,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Bouton Notifications (Cloche surélevée)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-            child: Material(
-              elevation: 4,
-              borderRadius: BorderRadius.circular(12),
-              color: controller.silentMode ? Colors.grey.shade600 : Colors.teal.shade400,
-              child: InkWell(
-                onTap: controller.toggleSilentMode,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    controller.silentMode ? Icons.notifications_off : Icons.notifications,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Indicateur de connexion (GROS bouton vert/rouge)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Material(
-              elevation: 4,
-              borderRadius: BorderRadius.circular(12),
-              color: isConnected ? Colors.green.shade600 : Colors.red.shade600,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isConnected ? Icons.check_circle : Icons.error,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      isConnected ? 'EN LIGNE' : 'HORS LIGNE',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          // AppBar responsive - adapte la taille selon l'écran
+          ..._buildResponsiveActions(context, controller, isConnected),
         ],
       ),
       body: Column(
@@ -246,5 +179,146 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         ],
       ),
     );
+  }
+
+  /// Construire les boutons de l'AppBar de manière responsive
+  List<Widget> _buildResponsiveActions(BuildContext context, ChatController controller, bool isConnected) {
+    // Taille adaptative selon l'écran
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double buttonSize = screenWidth < 360 ? 20.0 : 24.0;
+    final double padding = screenWidth < 360 ? 6.0 : 8.0;
+    final double horizontalPadding = screenWidth < 360 ? 2.0 : 4.0;
+
+    return [
+      // Bouton Galerie Photo (❤️)
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: padding),
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.pink.shade400,
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute<Widget>(builder: (_) => const PhotoGalleryPage()),
+              );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: EdgeInsets.all(padding),
+              child: Icon(
+                Icons.favorite,
+                color: Colors.white,
+                size: buttonSize,
+              ),
+            ),
+          ),
+        ),
+      ),
+      // Bouton CAMÉRA (📷) - Prendre photo/vidéo
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: padding),
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.blue.shade600,
+          child: InkWell(
+            onTap: () async {
+              // Menu: Photo ou Vidéo (texte adapté selon la version)
+              final bool isChinese = AppEnv.defaultDirection == 'zh2fr';
+              showModalBottomSheet(
+                context: context,
+                builder: (context) => SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                        title: Text(isChinese ? '拍照' : 'Prendre une photo'),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await ref.read(chatControllerProvider.notifier).pickAndSendCameraPhoto();
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.videocam, color: Colors.red),
+                        title: Text(isChinese ? '录制视频' : 'Enregistrer une vidéo'),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await ref.read(chatControllerProvider.notifier).pickAndSendCameraVideo();
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.photo_library, color: Colors.green),
+                        title: Text(isChinese ? '从相册选择' : 'Choisir depuis la galerie'),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await ref.read(chatControllerProvider.notifier).pickAndSendAttachment();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: EdgeInsets.all(padding),
+              child: Icon(
+                Icons.camera_alt,
+                color: Colors.white,
+                size: buttonSize,
+              ),
+            ),
+          ),
+        ),
+      ),
+      // Bouton Notifications (🔔)
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: padding),
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(12),
+          color: controller.silentMode ? Colors.grey.shade600 : Colors.teal.shade400,
+          child: InkWell(
+            onTap: controller.toggleSilentMode,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: EdgeInsets.all(padding),
+              child: Icon(
+                controller.silentMode ? Icons.notifications_off : Icons.notifications,
+                color: Colors.white,
+                size: buttonSize,
+              ),
+            ),
+          ),
+        ),
+      ),
+      // Bouton Reconnexion (🔄) - Visible seulement si déconnecté
+      if (!isConnected)
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: padding),
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.orange.shade600,
+            child: InkWell(
+              onTap: () {
+                controller.reconnect();
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: EdgeInsets.all(padding),
+                child: Icon(
+                  Icons.refresh,
+                  color: Colors.white,
+                  size: buttonSize,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ];
   }
 }
