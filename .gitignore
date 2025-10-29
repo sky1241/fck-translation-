@@ -1,20 +1,16 @@
 # Sensitive files
 .secret_api_key.txt
+tools/.secret_api_key.txt
 *.env
 .env.*
 key.properties
 
 # Build outputs
 build/
-dist/*.apk
+dist/
 *.apk
 
-# IDE
-.idea/
-.vscode/
-*.iml
-
-# Flutter/Dart
+# Flutter
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -39,6 +35,10 @@ ios/Flutter/Flutter.podspec
 # Web
 web/index.html.bak
 
+# IDE
+.idea/
+*.iml
+.vscode/
+
 # Logs
 *.log
-

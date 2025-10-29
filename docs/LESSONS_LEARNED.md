@@ -89,6 +89,97 @@ org.gradle.daemon=true
 
 ---
 
+#### 1.5 **Solution Intermédiaire : Supprimer SEULEMENT le dossier `build/`**
+
+**Date découverte** : 18 Octobre 2025
+
+**PROBLÈME** : Les modifications de code ne sont PAS reflétées dans l'APK après build incrémental, mais on ne veut PAS faire `flutter clean` (trop long).
+
+**SOLUTION** :
+```powershell
+# Supprimer SEULEMENT le dossier build/ (pas les dépendances)
+Remove-Item -Recurse -Force build
+
+# Puis rebuild normalement
+flutter build apk --release [... dart-define ...]
+```
+
+**Résultat observé** :
+- ✅ Build prend ~30-35 minutes (au lieu de 2-7 min incrémental)
+- ✅ Mais plus rapide que `flutter clean` (60-90 min)
+- ✅ Les modifications sont GARANTIES d'être dans l'APK
+- ✅ Les dépendances Flutter ne sont PAS re-téléchargées
+
+**Quand utiliser ?**
+- ✅ Modifications UI pas reflétées après build incrémental
+- ✅ Cache Gradle/Dart semble corrompu
+- ✅ Avant de désinstaller/réinstaller l'app (dernier recours avant flutter clean)
+
+**IMPORTANT : Toujours faire force-stop après install**
+```powershell
+adb -s <DEVICE> install -r build/app/outputs/flutter-apk/app-release.apk
+adb -s <DEVICE> shell am force-stop <package.name>
+adb -s <DEVICE> shell am start -n <package.name>/.MainActivity
+```
+
+Sans le `force-stop`, l'ancien code reste en mémoire même avec le nouvel APK installé !
+
+---
+
+#### 1.6 **🚀 SOLUTION ULTIME : flutter run avec Hot Reload (93-95% de gain)**
+
+**Date découverte** : 18 Octobre 2025
+
+**LE PROBLÈME FONDAMENTAL** :
+On utilisait `flutter build apk --release` pour **CHAQUE** modification, même petite.
+- Temps : 2-35 minutes par test
+- Impossible de tester rapidement
+- Frustration énorme pour des changements UI mineurs
+
+**LA VRAIE SOLUTION** : Développer en mode **DEBUG** avec `flutter run`
+
+```powershell
+# Lancer UNE SEULE FOIS
+flutter run --dart-define=... [toutes les clés]
+
+# App s'installe et démarre sur le téléphone
+
+# Ensuite, modifier le code librement
+# Hot Reload automatique à chaque sauvegarde = 1-3 secondes ! ⚡
+
+# Commandes dans le terminal flutter :
+# r = Hot Reload (recharge code, garde état)
+# R = Hot Restart (redémarre app, reset état) 
+# q = Quitter
+```
+
+**Résultats observés** :
+- ✅ Hot Reload : **1-3 secondes** pour voir les changements UI
+- ✅ Hot Restart : **5-10 secondes** pour redémarrer l'app
+- ✅ Peut tester 20-30 modifications en 5 minutes !
+- ✅ Logs en temps réel
+- ⚠️ App en mode debug (plus lente, plus grosse)
+
+**Workflow recommandé** :
+1. **Dev phase** (90% du temps) : `flutter run` + hot reload constant
+2. **Validation phase** (5%) : `flutter build apk --release` + test final
+3. **Distribution** (5%) : Copier APK dans dist/ pour partage
+
+**Gain de temps** :
+- Avant : 10 modifs × 30 min = **5 heures**
+- Après : 10 modifs × 10 sec + 1 build final = **35 minutes**
+- **Gain : 93% !** 🚀
+
+**Documentation complète** : Voir `docs/WORKFLOW_RAPIDE_DEV.md`
+
+**IMPORTANT** : Hot Reload ne marche PAS pour :
+- Changements dans `main()`, `initState()`
+- Ajout d'assets ou modif `pubspec.yaml`
+- Code natif (Kotlin/Swift)
+→ Dans ces cas : Hot Restart (`R`) ou relancer `flutter run`
+
+---
+
 ## 🔔 2. NOTIFICATIONS ANDROID : LE CAUCHEMAR
 
 ### 🔴 PROBLÈME MAJEUR : Badges sur Icône NE MARCHENT PAS

@@ -279,9 +279,20 @@ class ChatController extends Notifier<List<ChatMessage>> {
     ref.notifyListeners();
 
     try {
-      // NE PAS créer de message utilisateur - afficher seulement la traduction
+      // 1. Créer TON message original (ce que TU vois dans TA langue)
+      final ChatMessage myMsg = ChatMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        originalText: text,
+        translatedText: '', // Pas de traduction pour ton propre message
+        isMe: true, // TON message
+        time: DateTime.now().toUtc(),
+        pinyin: null,
+        notes: null,
+      );
+      state = <ChatMessage>[...state, myMsg];
+      ref.notifyListeners();
       
-      // Broadcast to relay so the counterpart client receives it
+      // 2. Broadcast to relay so the counterpart client receives it
       if (broadcast && _rt != null && _rt!.enabled) {
         unawaited(_rt!.send(<String, Object?>{
           'type': 'text',
@@ -292,26 +303,6 @@ class ChatController extends Notifier<List<ChatMessage>> {
         }));
       }
 
-      // Appelle la traduction
-      final TranslationResult res = await _repo.translate(
-        text: text,
-        sourceLang: _sourceLang,
-        targetLang: _targetLang,
-        tone: _tone,
-        wantPinyin: _wantPinyin,
-      );
-
-      // Crée SEULEMENT le message traduit (1 bulle au lieu de 2)
-      final ChatMessage replyMsg = ChatMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        originalText: text, // On garde l'original pour référence mais pas affiché
-        translatedText: res.translation,
-        isMe: false, // IMPORTANT : false pour afficher côté destinataire
-        time: DateTime.now().toUtc(),
-        pinyin: res.pinyin,
-        notes: res.notes,
-      );
-      state = <ChatMessage>[...state, replyMsg];
       await saveMessages();
     } catch (e) {
       final String msg = e.toString();
@@ -368,7 +359,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
     if (target == _sourceLang) {
       final ChatMessage replyMsg = ChatMessage(
         id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
-        originalText: '',
+        originalText: text,
         translatedText: text,
         isMe: false,
         time: DateTime.now().toUtc(),
@@ -391,8 +382,8 @@ class ChatController extends Notifier<List<ChatMessage>> {
 
       final ChatMessage replyMsg = ChatMessage(
         id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
-        originalText: '',
-        translatedText: res.translation,
+        originalText: text, // Le texte original reçu (dans la langue de l'autre)
+        translatedText: res.translation, // La traduction dans TA langue
         isMe: false,
         time: DateTime.now().toUtc(),
         pinyin: res.pinyin,
