@@ -8,6 +8,9 @@ class ComposerBar extends StatelessWidget {
     required this.enabled,
     required this.hintText,
     this.onPickAttachment,
+    this.onRecordVoice,
+    this.isRecordingVoice = false,
+    this.recordingDuration = 0,
   });
 
   final TextEditingController controller;
@@ -15,6 +18,9 @@ class ComposerBar extends StatelessWidget {
   final bool enabled;
   final String hintText;
   final VoidCallback? onPickAttachment;
+  final Future<bool> Function()? onRecordVoice;
+  final bool isRecordingVoice;
+  final int recordingDuration;
 
   @override
   Widget build(BuildContext context) {
@@ -24,27 +30,72 @@ class ComposerBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
         child: Row(
           children: <Widget>[
-            IconButton(
-              tooltip: 'Pièce jointe',
-              onPressed: enabled ? onPickAttachment : null,
-              icon: const Icon(Icons.add),
-            ),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                enabled: enabled,
-                minLines: 1,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: hintText,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
+            // Bouton Microphone (Toujours visible)
+            GestureDetector(
+              onLongPressStart: (details) async {
+                if (onRecordVoice != null && enabled && !isRecordingVoice) {
+                  await onRecordVoice!();
+                }
+              },
+              onLongPressEnd: (details) async {
+                if (onRecordVoice != null && enabled && isRecordingVoice) {
+                  await onRecordVoice!();
+                }
+              },
+              child: Material(
+                color: isRecordingVoice 
+                    ? Colors.red.shade600 
+                    : Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.mic,
+                    color: Colors.white,
+                    size: 28,
                   ),
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                 ),
               ),
+            ),
+            Expanded(
+              child: isRecordingVoice
+                  ? Container(
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.mic, color: Colors.red.shade600, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatDuration(recordingDuration),
+                            style: TextStyle(
+                              color: Colors.red.shade600,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : TextField(
+                      controller: controller,
+                      enabled: enabled,
+                      minLines: 1,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: hintText,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 12,
+                        ),
+                      ),
+                    ),
             ),
             const SizedBox(width: 8),
             ValueListenableBuilder<TextEditingValue>(
@@ -64,6 +115,11 @@ class ComposerBar extends StatelessWidget {
       ),
     );
   }
-}
 
+  String _formatDuration(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+}
 

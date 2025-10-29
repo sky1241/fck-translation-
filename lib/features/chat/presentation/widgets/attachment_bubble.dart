@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import '../../data/models/attachment.dart';
 import 'base64_image_widget.dart';
+import 'audio_player_widget.dart';
 
 class AttachmentBubble extends StatelessWidget {
   const AttachmentBubble({super.key, required this.attachment, required this.isMe, this.time});
@@ -73,6 +74,37 @@ class AttachmentBubble extends StatelessWidget {
         ),
       );
     }
+    
+    if (attachment.kind == AttachmentKind.audio) {
+      // Audio player widget
+      final String? url = attachment.remoteUrl;
+      final String? local = attachment.localPath;
+      
+      return Container(
+        padding: const EdgeInsets.all(8),
+        child: local != null && File(local).existsSync()
+            ? AudioPlayerWidget(audioUrl: local, isMe: isMe)
+            : url != null
+                ? AudioPlayerWidget(audioUrl: url, isMe: isMe)
+                : Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.mic, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Voice message',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+      );
+    }
+    
     // Video placeholder
     return Row(
       mainAxisSize: MainAxisSize.min,

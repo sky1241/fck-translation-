@@ -24,6 +24,43 @@ class AttachmentPickerService {
     );
   }
 
+  /// Prendre une photo avec la caméra
+  Future<AttachmentDraft?> pickImageFromCamera() async {
+    final XFile? x = await _picker.pickImage(source: ImageSource.camera);
+    if (x == null) return null;
+    final String mime = _guessMime(x.path, fallback: 'image/jpeg');
+    int? size;
+    try {
+      size = await x.length();
+    } catch (_) {
+      size = null;
+    }
+    return AttachmentDraft(
+      kind: AttachmentKind.image,
+      sourcePath: x.path,
+      mimeType: mime,
+      estimatedBytes: size,
+    );
+  }
+
+  /// Prendre une vidéo avec la caméra
+  Future<AttachmentDraft?> pickVideoFromCamera() async {
+    final XFile? x = await _picker.pickVideo(source: ImageSource.camera);
+    if (x == null) return null;
+    int? size;
+    try {
+      size = await x.length();
+    } catch (_) {
+      size = null;
+    }
+    return AttachmentDraft(
+      kind: AttachmentKind.video,
+      sourcePath: x.path,
+      mimeType: 'video/mp4',
+      estimatedBytes: size,
+    );
+  }
+
   // Placeholder for future video support
   Future<AttachmentDraft?> pickVideo() async {
     final XFile? x = await _picker.pickVideo(source: ImageSource.gallery);

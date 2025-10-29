@@ -1,0 +1,48 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+build/
+ios/Flutter/Flutter.framework/
+ios/Flutter/Flutter.podspec
+pubspec.lock
+
+# Android
+**/local.properties
+**/keystore*
+
+# Web
+**/web/.dart_tool/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+tools/.secret_api_key.txt
+.env
+
+# Flutter/Dart
+.dart_tool/
+.packages
+pubspec.lock
+build/
+
+# IDEs
+.idea/
+.vscode/
+
+# Platform
+ios/Pods/
+android/.gradle/
+android/local.properties
+
+# Generated
+**/*.g.dart
+**/*.freezed.dart
+

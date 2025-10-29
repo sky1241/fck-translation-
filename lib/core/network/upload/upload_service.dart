@@ -2,6 +2,12 @@ import '../../../features/chat/data/models/attachment.dart';
 
 abstract class UploadService {
   Stream<UploadProgress> upload(AttachmentDraft draft);
+  
+  /// Upload audio files (voice messages)
+  Stream<UploadProgress> uploadAudio(AudioAttachmentDraft draft) {
+    // Par défaut, convertir en AttachmentDraft et utiliser upload
+    return upload(draft.toAttachmentDraft());
+  }
 }
 
 class UploadProgress {
