@@ -55,6 +55,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     print('[ChatPage] BUILD - isConnected=$isConnected');
 
     final String title = 'XiaoXin ${AppEnv.appVersion}';
+    
+    // Message de déconnexion selon la langue
+    final String disconnectMessage = controller.sourceLang == 'zh' 
+        ? '已断线 - 发送消息即可重新连接'
+        : 'Hors ligne - Envoyez un message pour vous reconnecter';
 
     return Scaffold(
       appBar: AppBar(
@@ -117,7 +122,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Hors ligne - Envoyez un message pour vous reconnecter',
+                      disconnectMessage,
                       style: TextStyle(
                         color: Colors.orange.shade900,
                         fontSize: 13,
@@ -158,9 +163,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             hintText: controller.sourceLang == 'fr'
                 ? 'Écrire en français…'
                 : '用中文输入…',
-                onPickAttachment: () async {
-                  await ref.read(chatControllerProvider.notifier).pickAndSendAttachment();
-                },
+            onPickAttachment: null, // Désactivé - microphon uniquement
+            onRecordVoice: () async {
+              final notifier = ref.read(chatControllerProvider.notifier);
+              if (notifier.isRecordingVoice) {
+                await notifier.stopRecordingVoice();
+                return true;
+              } else {
+                return await notifier.startRecordingVoice();
+              }
+            },
+            isRecordingVoice: controller.isRecordingVoice,
+            recordingDuration: controller.recordingDuration,
             onSend: () async {
               final text = _textCtrl.text;
               _textCtrl.clear();
@@ -295,6 +309,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ),
         ),
       ),
+      // Bouton Voice Message (🎤) - Déplacé dans ComposerBar
       // Bouton Reconnexion (🔄) - Visible seulement si déconnecté
       if (!isConnected)
         Padding(
