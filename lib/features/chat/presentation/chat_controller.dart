@@ -16,6 +16,7 @@ import '../../../core/network/message_queue.dart';
 import '../../../core/network/notification_service.dart';
 import '../../../core/network/badge_service.dart';
 import '../../../core/media/attachment_picker_service.dart';
+import '../../../core/media/audio_recorder_service.dart';
 import '../data/models/attachment.dart';
 import '../../../core/network/upload/cloud_upload_service.dart';
 import '../../../core/network/upload/upload_service.dart';
@@ -49,6 +50,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
   final AttachmentPickerService _picker = AttachmentPickerService();
   late final UploadService _uploader = CloudUploadService(endpointBase: AppEnv.uploadBaseUrl);
   final PhotoRepository _photoRepo = PhotoRepository();
+  final AudioRecorderService _audioRecorder = AudioRecorderService();
   StreamSubscription<bool>? _connectionSub;
 
   String get sourceLang => _sourceLang;
@@ -128,7 +130,11 @@ class ChatController extends Notifier<List<ChatMessage>> {
           // Utiliser base64 comme data URI si pas d'URL cloud
           final String effectiveUrl = url ?? base64Data!;
           
-          final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
+          final AttachmentKind kindAtt = k == 'video' 
+              ? AttachmentKind.video 
+              : (k == 'audio' 
+                  ? AttachmentKind.audio 
+                  : AttachmentKind.image);
           final Attachment att = Attachment(
             id: id,
             kind: kindAtt,
@@ -269,7 +275,11 @@ class ChatController extends Notifier<List<ChatMessage>> {
       attachments: <Attachment>[pending],
     );
     state = <ChatMessage>[...state, msg];
+    
+    // ✅ SAUVEGARDE IMMÉDIATE du message (même hors ligne)
+    await saveMessages();
     ref.notifyListeners();
+    print('[ChatController] 💾 Attachment message saved locally (offline-ready): $attId');
 
     // Upload with progress; on completion broadcast URL
     _uploader.upload(draft).listen((UploadProgress p) async {
@@ -350,7 +360,12 @@ class ChatController extends Notifier<List<ChatMessage>> {
         time: DateTime.now().toUtc(),
       );
       state = <ChatMessage>[...state, userMsg];
+      
+      // ✅ SAUVEGARDE IMMÉDIATE du message hors ligne
       await saveMessages();
+      ref.notifyListeners(); // Notifier pour que l'UI se mette à jour
+      
+      print('[ChatController] 💾 Message saved locally (offline-ready): $text');
 
       // Broadcast to relay so the counterpart client receives it
       // L'autre device va recevoir et traduire de son côté
@@ -540,7 +555,11 @@ class ChatController extends Notifier<List<ChatMessage>> {
       attachments: <Attachment>[pending],
     );
     state = <ChatMessage>[...state, msg];
+    
+    // ✅ SAUVEGARDE IMMÉDIATE du message (même hors ligne)
+    await saveMessages();
     ref.notifyListeners();
+    print('[ChatController] 💾 Camera photo message saved locally (offline-ready): $attId');
 
     // Upload avec la même logique que pickAndSendAttachment
     _uploader.upload(draft).listen((UploadProgress p) async {
@@ -611,7 +630,11 @@ class ChatController extends Notifier<List<ChatMessage>> {
       attachments: <Attachment>[pending],
     );
     state = <ChatMessage>[...state, msg];
+    
+    // ✅ SAUVEGARDE IMMÉDIATE du message (même hors ligne)
+    await saveMessages();
     ref.notifyListeners();
+    print('[ChatController] 💾 Camera video message saved locally (offline-ready): $attId');
 
     // Upload vidéo
     _uploader.upload(draft).listen((UploadProgress p) async {
@@ -671,8 +694,106 @@ class ChatController extends Notifier<List<ChatMessage>> {
       ref.notifyListeners();
     });
     
+    // Attendre un peu pour être sûr que la connexion est établie
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Traiter la queue maintenant si connecté
+    if (_rt!.isConnected) {
+      print('[ChatController] 🔄 Processing queue after manual reconnect...');
+      await _processQueue();
+    }
+    
     print('[ChatController] ✅ Reconnect complete');
     ref.notifyListeners();
   }
+
+  /// Démarrer l'enregistrement vocal
+  Future<bool> startRecordingVoice() async {
+    return await _audioRecorder.startRecording();
+  }
+
+  /// Arrêter l'enregistrement vocal et envoyer le message
+  Future<void> stopRecordingVoice() async {
+    final audioPath = await _audioRecorder.stopRecording();
+    
+    if (audioPath == null || audioPath.isEmpty) {
+      print('[ChatController] ❌ No audio recorded');
+      return;
+    }
+
+    print('[ChatController] 🎤 Voice recorded: $audioPath');
+    
+    // Créer l'attachement audio
+    final attId = DateTime.now().microsecondsSinceEpoch.toString();
+    final Attachment audioAtt = Attachment(
+      id: attId,
+      kind: AttachmentKind.audio,
+      mimeType: 'audio/m4a',
+      localPath: audioPath,
+      createdAt: DateTime.now().toUtc(),
+      status: AttachmentStatus.uploading,
+    );
+    
+    // Créer le message
+    final ChatMessage msg = ChatMessage(
+      id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+      originalText: '',
+      translatedText: '',
+      isMe: true,
+      time: DateTime.now().toUtc(),
+      attachments: <Attachment>[audioAtt],
+    );
+    
+    state = <ChatMessage>[...state, msg];
+    
+    // ✅ SAUVEGARDE IMMÉDIATE
+    await saveMessages();
+    ref.notifyListeners();
+    print('[ChatController] 💾 Voice message saved locally (offline-ready): $attId');
+    
+    // Upload et broadcast
+    final AudioAttachmentDraft draft = AudioAttachmentDraft(
+      kind: AttachmentKind.audio,
+      sourcePath: audioPath,
+      mimeType: 'audio/m4a',
+    );
+    
+    _uploader.uploadAudio(draft).listen((UploadProgress p) async {
+      final List<ChatMessage> updated = state.map((m) {
+        if (m.id != msg.id) return m;
+        final Attachment a = m.attachments.first.copyWith(
+          status: (p.remoteUrl != null || p.base64Data != null) 
+              ? AttachmentStatus.uploaded 
+              : AttachmentStatus.uploading,
+        );
+        return m.copyWith(attachments: <Attachment>[a]);
+      }).toList(growable: false);
+      state = updated;
+      ref.notifyListeners();
+
+      if (p.remoteUrl != null || p.base64Data != null) {
+        if (_rt != null && _rt!.enabled) {
+          unawaited(_sendOrQueue(<String, Object?>{
+            'type': 'attachment',
+            'id': attId,
+            'kind': 'audio',
+            'mime': 'audio/m4a',
+            'url': p.remoteUrl,
+            if (p.base64Data != null) 'base64': p.base64Data,
+            'ts': DateTime.now().toUtc().toIso8601String(),
+          }));
+        }
+        await saveMessages();
+      }
+    });
+  }
+
+  /// Annuler l'enregistrement vocal en cours
+  Future<void> cancelRecordingVoice() async {
+    await _audioRecorder.cancelRecording();
+  }
+
+  bool get isRecordingVoice => _audioRecorder.isRecording;
+  int get recordingDuration => _audioRecorder.durationSeconds;
 }
 

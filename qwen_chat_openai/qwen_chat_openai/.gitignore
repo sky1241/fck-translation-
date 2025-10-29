@@ -1,48 +1,30 @@
-# Flutter/Dart
+# Sensitive files
+tools/.secret_api_key.txt
+*.env
+.env.*
+
+# Build outputs
+build/
+dist/*.apk
+
+# Flutter
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-.metadata
-build/
-ios/Flutter/Flutter.framework/
-ios/Flutter/Flutter.podspec
-pubspec.lock
+.packages
 
 # Android
-**/local.properties
-**/keystore*
+android/key.properties
+android/keystore/*.keystore
+android/local.properties
+android/.gradle/
+android/app/build/
 
-# Web
-**/web/.dart_tool/
+# iOS
+ios/Pods/
+ios/.symlinks/
 
 # IDE
 .idea/
+*.iml
 .vscode/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Secrets
-tools/.secret_api_key.txt
-.env
-
-# Flutter/Dart
-.dart_tool/
-.packages
-pubspec.lock
-build/
-
-# IDEs
-.idea/
-.vscode/
-
-# Platform
-ios/Pods/
-android/.gradle/
-android/local.properties
-
-# Generated
-**/*.g.dart
-**/*.freezed.dart
-

@@ -14,6 +14,69 @@ class CloudUploadService implements UploadService {
   final String endpointBase; // e.g., https://your-upload-api
 
   @override
+  Stream<UploadProgress> uploadAudio(AudioAttachmentDraft draft) async* {
+    print('[CloudUploadService] 🎤 Uploading audio file: ${draft.sourcePath}');
+    yield UploadProgress(percent: 10);
+    
+    // For audio, fallback to base64 since audio files can be large
+    if (endpointBase.isEmpty) {
+      // No endpoint configured: embed as base64
+      try {
+        final File file = File(draft.sourcePath);
+        if (await file.exists()) {
+          final Uint8List bytes = await file.readAsBytes();
+          print('[CloudUploadService] 🎤 Audio file size: ${bytes.length} bytes');
+          
+          // Check if file is small enough for base64 (e.g., < 500KB)
+          if (bytes.length < 500 * 1024) {
+            print('[CloudUploadService] ✅ Converting audio to base64...');
+            final String b64 = 'data:audio/m4a;base64,${base64Encode(bytes)}';
+            yield UploadProgress(percent: 100, base64Data: b64);
+          } else {
+            print('[CloudUploadService] ❌ Audio file too large for base64');
+            yield UploadProgress(percent: 100);
+          }
+        } else {
+          print('[CloudUploadService] ❌ Audio file not found');
+          yield UploadProgress(percent: 100);
+        }
+      } catch (e) {
+        print('[CloudUploadService] ❌ Error uploading audio: $e');
+        yield UploadProgress(percent: 100);
+      }
+      return;
+    }
+    
+    // Try to upload to server if endpoint is configured
+    try {
+      final Uri uri = Uri.parse('$endpointBase/upload');
+      final req = http.MultipartRequest('POST', uri);
+      req.files.add(await http.MultipartFile.fromPath(
+        'file',
+        draft.sourcePath,
+        contentType: _contentType(draft.mimeType),
+      ));
+      req.fields['kind'] = 'audio';
+      yield UploadProgress(percent: 50);
+      
+      final resp = await req.send();
+      yield UploadProgress(percent: 80);
+      final String body = await resp.stream.bytesToString();
+      
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final String url = _extractUrl(body) ?? '';
+        yield UploadProgress(percent: 100, remoteUrl: url.isNotEmpty ? url : null);
+      } else {
+        print('[CloudUploadService] ❌ Upload failed, no fallback for audio');
+        yield UploadProgress(percent: 100);
+      }
+    } catch (e) {
+      print('[CloudUploadService] ❌ Error during audio upload: $e');
+      yield UploadProgress(percent: 100);
+    }
+  }
+
+  @override
   Stream<UploadProgress> upload(AttachmentDraft draft) async* {
     // Best-effort simple multipart upload (no chunked progress from http)
     // Emit a few synthetic steps for UX, then final URL provided by server

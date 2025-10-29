@@ -13,7 +13,7 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'XiaoXin002',
+      title: 'XiaoXin ${AppEnv.appVersion}',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
@@ -65,7 +65,7 @@ class _StartupState extends ConsumerState<_Startup> {
         controller.setDirection(fr2zh ? 'fr' : 'zh', fr2zh ? 'zh' : 'fr');
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute<Widget>(builder: (_) => const ChatPage()),
+          MaterialPageRoute<Widget>(builder: (_) => ChatPage()),
         );
         return;
       }
@@ -76,7 +76,7 @@ class _StartupState extends ConsumerState<_Startup> {
     } else {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute<Widget>(builder: (_) => const ChatPage()),
+        MaterialPageRoute<Widget>(builder: (_) => ChatPage()),
       );
     }
   }
