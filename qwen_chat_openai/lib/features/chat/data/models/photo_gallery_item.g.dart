@@ -6,9 +6,8 @@ part of 'photo_gallery_item.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$PhotoGalleryItemImpl _$$PhotoGalleryItemImplFromJson(
-        Map<String, dynamic> json) =>
-    _$PhotoGalleryItemImpl(
+_PhotoGalleryItem _$PhotoGalleryItemFromJson(Map<String, dynamic> json) =>
+    _PhotoGalleryItem(
       id: json['id'] as String,
       url: json['url'] as String,
       localPath: json['localPath'] as String?,
@@ -20,8 +19,7 @@ _$PhotoGalleryItemImpl _$$PhotoGalleryItemImplFromJson(
           PhotoStatus.remote,
     );
 
-Map<String, dynamic> _$$PhotoGalleryItemImplToJson(
-        _$PhotoGalleryItemImpl instance) =>
+Map<String, dynamic> _$PhotoGalleryItemToJson(_PhotoGalleryItem instance) =>
     <String, dynamic>{
       'id': instance.id,
       'url': instance.url,

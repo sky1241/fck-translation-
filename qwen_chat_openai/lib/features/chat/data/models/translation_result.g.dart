@@ -6,16 +6,14 @@ part of 'translation_result.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$TranslationResultImpl _$$TranslationResultImplFromJson(
-        Map<String, dynamic> json) =>
-    _$TranslationResultImpl(
+_TranslationResult _$TranslationResultFromJson(Map<String, dynamic> json) =>
+    _TranslationResult(
       translation: json['translation'] as String,
       pinyin: json['pinyin'] as String?,
       notes: json['notes'] as String?,
     );
 
-Map<String, dynamic> _$$TranslationResultImplToJson(
-        _$TranslationResultImpl instance) =>
+Map<String, dynamic> _$TranslationResultToJson(_TranslationResult instance) =>
     <String, dynamic>{
       'translation': instance.translation,
       'pinyin': instance.pinyin,
