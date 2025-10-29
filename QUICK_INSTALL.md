@@ -55,3 +55,4 @@ L'APK RELEASE dans `build\app\outputs\flutter-apk\app-release.apk`
 Si vous voyez encore le cœur = ancienne version en cache.  
 Solution = Désinstaller puis réinstaller l'APK.
 
+
