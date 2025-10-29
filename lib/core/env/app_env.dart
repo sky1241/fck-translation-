@@ -28,6 +28,10 @@ class AppEnv {
   );
   static const String relayRoom =
       String.fromEnvironment('RELAY_ROOM', defaultValue: 'demo123');
+  
+  // App version identifier (001 or 002)
+  static const String appVersion =
+      String.fromEnvironment('APP_VERSION', defaultValue: '001');
 
   // Optional media upload endpoint (cloud API base URL)
   static const String uploadBaseUrl =

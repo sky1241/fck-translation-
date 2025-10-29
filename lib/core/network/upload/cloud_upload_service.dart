@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
+import 'package:image/image.dart' as img;
 import '../../../features/chat/data/models/attachment.dart';
 import 'upload_service.dart';
 
@@ -19,15 +21,18 @@ class CloudUploadService implements UploadService {
     if (endpointBase.isEmpty) {
       // No endpoint configured: embed small files as base64 and finish.
       try {
-        final File file = File(draft.sourcePath);
-        final List<int> bytes = await file.readAsBytes();
-        if (bytes.length < 800 * 1024) {
-          final String b64 = 'data:${draft.mimeType};base64,${base64Encode(bytes)}';
+        print('[CloudUploadService] 🔄 Converting image to JPEG format...');
+        final Uint8List? convertedBytes = await _convertToJpeg(draft.sourcePath);
+        if (convertedBytes != null && convertedBytes.length < 400 * 1024) {
+          print('[CloudUploadService] ✅ Converted to JPEG: ${convertedBytes.length} bytes');
+          final String b64 = 'data:image/jpeg;base64,${base64Encode(convertedBytes)}';
           yield UploadProgress(percent: 100, base64Data: b64);
         } else {
+          print('[CloudUploadService] ❌ Conversion failed or image too large');
           yield UploadProgress(percent: 100);
         }
-      } catch (_) {
+      } catch (e) {
+        print('[CloudUploadService] ❌ Error: $e');
         yield UploadProgress(percent: 100);
       }
       return;
@@ -48,15 +53,19 @@ class CloudUploadService implements UploadService {
       final String url = _extractUrl(body) ?? '';
       yield UploadProgress(percent: 100, remoteUrl: url.isNotEmpty ? url : null);
     } else {
+      // Upload failed: fallback to base64
       try {
-        final File file = File(draft.sourcePath);
-        final List<int> bytes = await file.readAsBytes();
-        if (bytes.length < 800 * 1024) {
-          final String b64 = 'data:${draft.mimeType};base64,${base64Encode(bytes)}';
+        print('[CloudUploadService] ⚠️ Upload failed, fallback to base64...');
+        final Uint8List? convertedBytes = await _convertToJpeg(draft.sourcePath);
+        if (convertedBytes != null && convertedBytes.length < 400 * 1024) {
+          print('[CloudUploadService] ✅ Fallback: Converted to JPEG: ${convertedBytes.length} bytes');
+          final String b64 = 'data:image/jpeg;base64,${base64Encode(convertedBytes)}';
           yield UploadProgress(percent: 100, base64Data: b64);
           return;
         }
-      } catch (_) {}
+      } catch (e) {
+        print('[CloudUploadService] ❌ Fallback error: $e');
+      }
       yield UploadProgress(percent: 100);
     }
   }
@@ -70,6 +79,34 @@ class CloudUploadService implements UploadService {
   String? _extractUrl(String body) {
     final match = RegExp(r'"url"\s*:\s*"([^"]+)"').firstMatch(body);
     return match?.group(1);
+  }
+
+  /// Convert any image format to JPEG bytes (Skia-compatible)
+  Future<Uint8List?> _convertToJpeg(String filePath) async {
+    try {
+      final File file = File(filePath);
+      final Uint8List bytes = await file.readAsBytes();
+      
+      print('[CloudUploadService] 🔍 Original image size: ${bytes.length} bytes');
+      
+      // Decode image using `image` package (supports JPEG, PNG, GIF, BMP, TIFF, TGA, PSD, PVR, etc.)
+      final img.Image? image = img.decodeImage(bytes);
+      if (image == null) {
+        print('[CloudUploadService] ❌ Failed to decode image');
+        return null;
+      }
+      
+      print('[CloudUploadService] 🔍 Image decoded: ${image.width}x${image.height}');
+      
+      // Re-encode as JPEG with quality 60 (smaller size for WebSocket compatibility)
+      final List<int> jpegBytes = img.encodeJpg(image, quality: 60);
+      print('[CloudUploadService] 🔍 JPEG encoded: ${jpegBytes.length} bytes');
+      
+      return Uint8List.fromList(jpegBytes);
+    } catch (e) {
+      print('[CloudUploadService] ❌ Failed to convert image: $e');
+      return null;
+    }
   }
 }
 

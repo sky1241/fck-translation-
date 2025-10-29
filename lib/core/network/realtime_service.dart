@@ -14,11 +14,17 @@ class RealtimeService {
   StreamSubscription<dynamic>? _sub;
   final String _url;
   final String _room;
+  bool _isConnected = false;
 
   final StreamController<Map<String, dynamic>> _incomingCtrl =
       StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get messages => _incomingCtrl.stream;
 
+  final StreamController<bool> _connectionCtrl =
+      StreamController<bool>.broadcast();
+  Stream<bool> get connectionStatus => _connectionCtrl.stream;
+  
+  bool get isConnected => _isConnected;
   bool get enabled => (_url.isNotEmpty || AppEnv.relayWsUrl.isNotEmpty) && _room.isNotEmpty;
 
   Future<void> connect() async {
@@ -32,50 +38,89 @@ class RealtimeService {
     final Uri uri = Uri.parse('$effectiveUrl?room=${Uri.encodeComponent(_room)}');
     // ignore: avoid_print
     print('[relay] connecting to $uri');
-    _channel = WebSocketChannel.connect(uri);
-    _sub = _channel!.stream.listen((dynamic data) {
-      try {
-        // Decode to text if a binary frame is received; tolerate malformed bytes
-        final String text = (data is String)
-            ? data
-            : utf8.decode(data as List<int>, allowMalformed: true);
-        // ignore: avoid_print
-        print('[relay][in] $text');
-        final Map<String, dynamic> map = jsonDecode(text) as Map<String, dynamic>;
-        _incomingCtrl.add(map);
-      } catch (_) {
-        // ignore invalid frames
+    
+    try {
+      _channel = WebSocketChannel.connect(uri);
+      
+      _sub = _channel!.stream.listen((dynamic data) {
+        // Première réception de données = connexion établie
+        if (!_isConnected) {
+          _isConnected = true;
+          _connectionCtrl.add(true);
+          print('[relay] ✅ Connected (first data received)');
+        }
+        
+        try {
+          // Decode to text if a binary frame is received; tolerate malformed bytes
+          final String text = (data is String)
+              ? data
+              : utf8.decode(data as List<int>, allowMalformed: true);
+          // ignore: avoid_print
+          print('[relay][in] $text');
+          final Map<String, dynamic> map = jsonDecode(text) as Map<String, dynamic>;
+          _incomingCtrl.add(map);
+        } catch (_) {
+          // ignore invalid frames
+        }
+      }, onDone: _onDisconnect, onError: (_) => _onDisconnect());
+      
+      // Marquer comme "connecté" après un délai raisonnable
+      // Cela permet d'envoyer même sans avoir reçu de données
+      await Future.delayed(const Duration(seconds: 2));
+      if (_channel != null && !_isConnected) {
+        _isConnected = true;
+        _connectionCtrl.add(true);
+        print('[relay] ✅ Connected (timeout)');
       }
-    }, onDone: _retry, onError: (_) => _retry());
+    } catch (e) {
+      print('[relay] ❌ Connection error: $e');
+      _onDisconnect();
+    }
   }
 
   void _cleanup() {
     _sub?.cancel();
     _sub = null;
     _channel = null;
+    if (_isConnected) {
+      _isConnected = false;
+      _connectionCtrl.add(false);
+      print('[relay] 🔴 Disconnected');
+    }
   }
 
-  void _retry() {
+  void _onDisconnect() {
     _cleanup();
     // simple backoff reconnect
-    Future<void>.delayed(const Duration(seconds: 2), () {
+    Future<void>.delayed(const Duration(seconds: 3), () {
       // ignore: avoid_print
-      print('[relay] reconnecting...');
+      print('[relay] 🔄 Reconnecting...');
       connect();
     });
   }
 
-  Future<void> send(Map<String, Object?> payload) async {
-    if (_channel == null) return;
-    final String text = jsonEncode(payload);
-    // ignore: avoid_print
-    print('[relay][out] $text');
-    _channel!.sink.add(text);
+  Future<bool> send(Map<String, Object?> payload) async {
+    if (_channel == null || !_isConnected) {
+      print('[relay][out] ❌ Not connected, message queued');
+      return false;
+    }
+    
+    try {
+      final String text = jsonEncode(payload);
+      // ignore: avoid_print
+      print('[relay][out] $text');
+      _channel!.sink.add(text);
+      return true;
+    } catch (e) {
+      print('[relay][out] ❌ Send error: $e');
+      return false;
+    }
   }
 
   Future<void> dispose() async {
     await _sub?.cancel();
     await _incomingCtrl.close();
+    await _connectionCtrl.close();
     await _channel?.sink.close();
     _channel = null;
   }
