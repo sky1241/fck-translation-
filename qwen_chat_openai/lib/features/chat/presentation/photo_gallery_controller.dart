@@ -5,15 +5,24 @@ import '../data/photo_repository.dart';
 import '../data/photo_cache_service.dart';
 import '../domain/i_photo_repository.dart';
 
-final photoRepositoryProvider = Provider<IPhotoRepository>((ref) => PhotoRepository());
-final photoCacheServiceProvider = Provider((ref) => PhotoCacheService());
+final photoRepositoryProvider = Provider<IPhotoRepository>((ref) {
+  return PhotoRepository();
+});
+
+final photoCacheServiceProvider = Provider<PhotoCacheService>((ref) {
+  return PhotoCacheService();
+});
 
 final photoGalleryControllerProvider =
     StateNotifierProvider<PhotoGalleryController, PhotoGalleryState>(
-  (ref) => PhotoGalleryController(
-    photoRepository: ref.watch(photoRepositoryProvider),
-    cacheService: ref.watch(photoCacheServiceProvider),
-  ),
+  (ref) {
+    final IPhotoRepository repository = ref.watch(photoRepositoryProvider);
+    final PhotoCacheService cacheService = ref.watch(photoCacheServiceProvider);
+    return PhotoGalleryController(
+      photoRepository: repository,
+      cacheService: cacheService,
+    );
+  },
 );
 
 class PhotoGalleryState {

@@ -29,8 +29,8 @@ class _PhotoGalleryPageState extends ConsumerState<PhotoGalleryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(photoGalleryControllerProvider);
-    final controller = ref.watch(photoGalleryControllerProvider.notifier);
+    final PhotoGalleryState state = ref.watch(photoGalleryControllerProvider);
+    final PhotoGalleryController controller = ref.watch(photoGalleryControllerProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
