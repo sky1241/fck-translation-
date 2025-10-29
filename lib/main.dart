@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/network/notification_service.dart';
+import 'core/network/badge_service.dart';
 import 'core/env/app_env.dart';
 
 Future<void> main() async {
@@ -18,5 +19,10 @@ Future<void> main() async {
   } catch (_) {
     // Do not block startup if notifications init fails
   }
-  runApp(const ProviderScope(child: App()));
+  
+  // Initialize badge service with provider container
+  final container = ProviderContainer();
+  BadgeService.setContainer(container);
+  
+  runApp(ProviderScope(child: const App()));
 }

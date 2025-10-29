@@ -14,6 +14,13 @@ class NotificationService {
     try {
       await _fln.initialize(init);
       
+      // Request notification permission explicitly (Android 13+ / API 33+)
+      // This will show the system permission dialog on first launch
+      final androidImplementation = _fln.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImplementation != null) {
+        await androidImplementation.requestNotificationsPermission();
+      }
+      
       // Create notification channel explicitly with sound enabled (Android 8.0+)
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
         'unread_messages_v2', // Changed ID to force new channel creation
@@ -25,9 +32,7 @@ class NotificationService {
         showBadge: true,
       );
       
-      await _fln
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
+      await androidImplementation?.createNotificationChannel(channel);
     } catch (_) {
       // Swallow initialization errors to avoid blocking app startup
     }

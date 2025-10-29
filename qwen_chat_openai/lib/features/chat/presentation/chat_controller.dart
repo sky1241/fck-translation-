@@ -74,8 +74,10 @@ class ChatController extends Notifier<List<ChatMessage>> {
         final String? kind = msg['type'] as String?;
         if (kind == 'text') {
           final String? text = msg['text'] as String?;
+          final String? srcLang = msg['source_lang'] as String?;
+          final String? tgtLang = msg['target_lang'] as String?;
           if (text == null) return;
-          _receiveRemote(text);
+          _receiveRemote(text, sourceLang: srcLang, targetLang: tgtLang);
           // Increment badge FIRST (before notification that might fail)
           unawaited(BadgeService.increment());
           // Notification locale simple (foreground) - may fail, but badge already updated
@@ -277,9 +279,20 @@ class ChatController extends Notifier<List<ChatMessage>> {
     ref.notifyListeners();
 
     try {
-      // NE PAS créer de message utilisateur - afficher seulement la traduction
+      // 1. Créer TON message original (ce que TU vois dans TA langue)
+      final ChatMessage myMsg = ChatMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        originalText: text,
+        translatedText: '', // Pas de traduction pour ton propre message
+        isMe: true, // TON message
+        time: DateTime.now().toUtc(),
+        pinyin: null,
+        notes: null,
+      );
+      state = <ChatMessage>[...state, myMsg];
+      ref.notifyListeners();
       
-      // Broadcast to relay so the counterpart client receives it
+      // 2. Broadcast to relay so the counterpart client receives it
       if (broadcast && _rt != null && _rt!.enabled) {
         unawaited(_rt!.send(<String, Object?>{
           'type': 'text',
@@ -290,26 +303,6 @@ class ChatController extends Notifier<List<ChatMessage>> {
         }));
       }
 
-      // Appelle la traduction
-      final TranslationResult res = await _repo.translate(
-        text: text,
-        sourceLang: _sourceLang,
-        targetLang: _targetLang,
-        tone: _tone,
-        wantPinyin: _wantPinyin,
-      );
-
-      // Crée SEULEMENT le message traduit (1 bulle au lieu de 2)
-      final ChatMessage replyMsg = ChatMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        originalText: text, // On garde l'original pour référence mais pas affiché
-        translatedText: res.translation,
-        isMe: false, // IMPORTANT : false pour afficher côté destinataire
-        time: DateTime.now().toUtc(),
-        pinyin: res.pinyin,
-        notes: res.notes,
-      );
-      state = <ChatMessage>[...state, replyMsg];
       await saveMessages();
     } catch (e) {
       final String msg = e.toString();
@@ -357,24 +350,40 @@ class ChatController extends Notifier<List<ChatMessage>> {
     return 'fr';
   }
 
-  Future<void> _receiveRemote(String text) async {
-    // Translate incoming text into our local target language
-    // Assume the peer sends in our target language
-    final String src = _targetLang;
-    final String target = _sourceLang;
+  Future<void> _receiveRemote(String text, {String? sourceLang, String? targetLang}) async {
+    // Use the metadata from the sender if available, otherwise fall back to assumptions
+    final String src = sourceLang ?? _targetLang;
+    final String target = targetLang ?? _sourceLang;
+    
+    // If the message is already in our language, display it without translation
+    if (target == _sourceLang) {
+      final ChatMessage replyMsg = ChatMessage(
+        id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+        originalText: text,
+        translatedText: text,
+        isMe: false,
+        time: DateTime.now().toUtc(),
+      );
+      state = <ChatMessage>[...state, replyMsg];
+      await saveMessages();
+      ref.notifyListeners();
+      return;
+    }
+    
+    // Otherwise, translate the message
     try {
       final TranslationResult res = await _repo.translate(
         text: text,
         sourceLang: src,
-        targetLang: target,
+        targetLang: _sourceLang,
         tone: _tone,
-        wantPinyin: target == 'zh' ? _wantPinyin : false,
+        wantPinyin: _sourceLang == 'zh' ? _wantPinyin : false,
       );
 
       final ChatMessage replyMsg = ChatMessage(
         id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
-        originalText: '',
-        translatedText: res.translation,
+        originalText: text, // Le texte original reçu (dans la langue de l'autre)
+        translatedText: res.translation, // La traduction dans TA langue
         isMe: false,
         time: DateTime.now().toUtc(),
         pinyin: res.pinyin,
