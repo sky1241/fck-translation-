@@ -23,3 +23,12 @@ plugins {
 }
 
 include(":app")
+
+// Exclure record_linux qui cause des problèmes de namespace
+gradle.beforeProject {
+    if (project.path.contains("record_linux")) {
+        project.tasks.configureEach {
+            enabled = false
+        }
+    }
+}

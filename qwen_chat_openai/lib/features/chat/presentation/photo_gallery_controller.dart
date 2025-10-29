@@ -14,15 +14,8 @@ final photoCacheServiceProvider = Provider<PhotoCacheService>((ref) {
 });
 
 final photoGalleryControllerProvider =
-    StateNotifierProvider<PhotoGalleryController, PhotoGalleryState>(
-  (ref) {
-    final IPhotoRepository repository = ref.watch(photoRepositoryProvider);
-    final PhotoCacheService cacheService = ref.watch(photoCacheServiceProvider);
-    return PhotoGalleryController(
-      photoRepository: repository,
-      cacheService: cacheService,
-    );
-  },
+    NotifierProvider<PhotoGalleryController, PhotoGalleryState>(
+  PhotoGalleryController.new,
 );
 
 class PhotoGalleryState {
@@ -57,16 +50,16 @@ class PhotoGalleryState {
   }
 }
 
-class PhotoGalleryController extends StateNotifier<PhotoGalleryState> {
-  final IPhotoRepository _photoRepository;
-  final PhotoCacheService _cacheService;
+class PhotoGalleryController extends Notifier<PhotoGalleryState> {
+  late final IPhotoRepository _photoRepository;
+  late final PhotoCacheService _cacheService;
 
-  PhotoGalleryController({
-    required IPhotoRepository photoRepository,
-    required PhotoCacheService cacheService,
-  })  : _photoRepository = photoRepository,
-        _cacheService = cacheService,
-        super(const PhotoGalleryState());
+  @override
+  PhotoGalleryState build() {
+    _photoRepository = ref.watch(photoRepositoryProvider);
+    _cacheService = ref.watch(photoCacheServiceProvider);
+    return const PhotoGalleryState();
+  }
 
   /// Charger toutes les photos
   Future<void> loadPhotos() async {
@@ -167,4 +160,3 @@ class PhotoGalleryController extends StateNotifier<PhotoGalleryState> {
     return await _cacheService.getCachedPhotoPath(photoId);
   }
 }
-

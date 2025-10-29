@@ -12,10 +12,14 @@ import '../../../core/env/app_env.dart';
 import '../../../core/network/realtime_service.dart';
 import '../../../core/network/notification_service.dart';
 import '../../../core/network/badge_service.dart';
+import '../../../core/network/message_queue.dart';
 import '../../../core/media/attachment_picker_service.dart';
+import '../../../core/media/audio_recorder_service.dart';
 import '../data/models/attachment.dart';
 import '../../../core/network/upload/cloud_upload_service.dart';
 import '../../../core/network/upload/upload_service.dart';
+import '../data/models/photo_gallery_item.dart';
+import '../data/photo_repository.dart';
 
 final IChatRepository _defaultRepo = ChatRepository();
 
@@ -39,9 +43,13 @@ class ChatController extends Notifier<List<ChatMessage>> {
   final List<String> _pendingTexts = <String>[];
   Duration _postSendDelay = const Duration(milliseconds: 1200);
   RealtimeService? _rt;
+  final MessageQueue _messageQueue = MessageQueue();
   final NotificationService _notif = NotificationService();
   final AttachmentPickerService _picker = AttachmentPickerService();
   late final UploadService _uploader = CloudUploadService(endpointBase: AppEnv.uploadBaseUrl);
+  final PhotoRepository _photoRepo = PhotoRepository();
+  final AudioRecorderService _audioRecorder = AudioRecorderService();
+  StreamSubscription<bool>? _connectionSub;
 
   String get sourceLang => _sourceLang;
   String get targetLang => _targetLang;
@@ -50,6 +58,9 @@ class ChatController extends Notifier<List<ChatMessage>> {
   bool get isSending => _isSending;
   String? get lastError => _lastError;
   bool get silentMode => _silentMode;
+  bool get isConnected => _rt?.isConnected ?? false;
+  bool get isRecordingVoice => _audioRecorder.isRecording;
+  int get recordingDuration => _audioRecorder.durationSeconds;
 
   @override
   List<ChatMessage> build() {
@@ -66,10 +77,25 @@ class ChatController extends Notifier<List<ChatMessage>> {
     _wantPinyin = AppEnv.defaultPinyin;
     // Load silent mode preference
     _loadSilentMode();
+    // Load message queue
+    _messageQueue.load();
     // Connect realtime relay if a room is present; URL may be provided at build or defaulted elsewhere
     if (AppEnv.relayRoom.isNotEmpty) {
       _rt = RealtimeService(url: AppEnv.relayWsUrl, room: AppEnv.relayRoom);
       _rt!.connect();
+      
+      // Listen to connection status changes
+      _connectionSub = _rt!.connectionStatus.listen((bool isConnected) {
+        if (isConnected) {
+          print('[ChatController] ✅ Connected - processing queue...');
+          _processQueue();
+        } else {
+          print('[ChatController] 🔴 Disconnected');
+        }
+        // Notifier l'UI du changement de statut de connexion
+        ref.notifyListeners();
+      });
+      
       _rt!.messages.listen((Map<String, dynamic> msg) {
         final String? kind = msg['type'] as String?;
         if (kind == 'text') {
@@ -396,6 +422,298 @@ class ChatController extends Notifier<List<ChatMessage>> {
       _lastError = e.toString();
       ref.notifyListeners();
     }
+  }
+
+  /// Envoyer un message ou le mettre en queue si pas de connexion
+  Future<void> _sendOrQueue(Map<String, Object?> message) async {
+    if (_rt == null || !_rt!.enabled) return;
+    
+    final String queuedId = await _messageQueue.enqueue(message);
+    print('[ChatController] 📝 Message queued (ID: $queuedId, ${_messageQueue.currentSize} pending)');
+    
+    final bool sent = await _rt!.send(message);
+    
+    if (sent) {
+      await _messageQueue.remove(queuedId);
+      print('[ChatController] ✅ Message $queuedId sent & removed from queue');
+    } else {
+      print('[ChatController] ❌ Message $queuedId failed, staying in queue for retry');
+    }
+  }
+
+  /// Traiter la queue des messages en attente
+  Future<void> _processQueue() async {
+    final messages = _messageQueue.getAll();
+    
+    if (messages.isEmpty) {
+      print('[ChatController] Queue empty');
+      return;
+    }
+    
+    print('[ChatController] Processing ${messages.length} queued messages...');
+    
+    for (final queuedMsg in messages) {
+      if (queuedMsg.retryCount > 5) {
+        print('[ChatController] Message ${queuedMsg.id} exceeded retry limit, removing');
+        await _messageQueue.remove(queuedMsg.id);
+        continue;
+      }
+      
+      final bool sent = await _rt!.send(queuedMsg.message);
+      
+      if (sent) {
+        print('[ChatController] ✅ Message ${queuedMsg.id} sent');
+        await _messageQueue.remove(queuedMsg.id);
+      } else {
+        print('[ChatController] ❌ Message ${queuedMsg.id} failed, retry later');
+        await _messageQueue.incrementRetry(queuedMsg.id);
+      }
+      
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+    
+    print('[ChatController] Queue processed (${_messageQueue.currentSize} remaining)');
+  }
+  
+  /// Prendre une photo avec la caméra et l'envoyer
+  Future<void> pickAndSendCameraPhoto() async {
+    final AttachmentDraft? draft = await _picker.pickImageFromCamera();
+    if (draft == null) return;
+    
+    final String attId = DateTime.now().microsecondsSinceEpoch.toString();
+    final Attachment pending = Attachment(
+      id: attId,
+      kind: draft.kind,
+      mimeType: draft.mimeType,
+      localPath: draft.sourcePath,
+      createdAt: DateTime.now().toUtc(),
+      status: AttachmentStatus.uploading,
+    );
+    final ChatMessage msg = ChatMessage(
+      id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+      originalText: '',
+      translatedText: '',
+      isMe: true,
+      time: DateTime.now().toUtc(),
+      attachments: <Attachment>[pending],
+    );
+    state = <ChatMessage>[...state, msg];
+    
+    await saveMessages();
+    ref.notifyListeners();
+
+    _uploader.upload(draft).listen((UploadProgress p) async {
+      final List<ChatMessage> updated = state.map((m) {
+        if (m.id != msg.id) return m;
+        final Attachment a = m.attachments.first.copyWith(
+          status: (p.remoteUrl != null) ? AttachmentStatus.uploaded : AttachmentStatus.uploading,
+        );
+        return m.copyWith(attachments: <Attachment>[a]);
+      }).toList(growable: false);
+      state = updated;
+      ref.notifyListeners();
+
+      if (p.remoteUrl != null || p.base64Data != null) {
+        if (_rt != null && _rt!.enabled) {
+          unawaited(_sendOrQueue(<String, Object?>{
+            'type': 'attachment',
+            'id': attId,
+            'kind': draft.kind.name,
+            'mime': draft.mimeType,
+            'url': p.remoteUrl,
+            if (p.base64Data != null) 'base64': p.base64Data,
+            'ts': DateTime.now().toUtc().toIso8601String(),
+          }));
+        }
+        await saveMessages();
+        
+        if (draft.kind == AttachmentKind.image) {
+          try {
+            final String photoUrl = p.base64Data ?? p.remoteUrl ?? draft.sourcePath ?? 'file://local';
+            await _photoRepo.savePhoto(PhotoGalleryItem(
+              id: attId,
+              url: photoUrl,
+              localPath: draft.sourcePath,
+              timestamp: DateTime.now().toUtc(),
+              isFromMe: true,
+              status: PhotoStatus.cached,
+            ));
+          } catch (e) {
+            print('[ChatController] Error saving photo to gallery: $e');
+          }
+        }
+      }
+    });
+  }
+
+  /// Prendre une vidéo avec la caméra et l'envoyer
+  Future<void> pickAndSendCameraVideo() async {
+    final AttachmentDraft? draft = await _picker.pickVideoFromCamera();
+    if (draft == null) return;
+    
+    final String attId = DateTime.now().microsecondsSinceEpoch.toString();
+    final Attachment pending = Attachment(
+      id: attId,
+      kind: draft.kind,
+      mimeType: draft.mimeType,
+      localPath: draft.sourcePath,
+      createdAt: DateTime.now().toUtc(),
+      status: AttachmentStatus.uploading,
+    );
+    final ChatMessage msg = ChatMessage(
+      id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+      originalText: '',
+      translatedText: '',
+      isMe: true,
+      time: DateTime.now().toUtc(),
+      attachments: <Attachment>[pending],
+    );
+    state = <ChatMessage>[...state, msg];
+    
+    await saveMessages();
+    ref.notifyListeners();
+
+    _uploader.upload(draft).listen((UploadProgress p) async {
+      final List<ChatMessage> updated = state.map((m) {
+        if (m.id != msg.id) return m;
+        final Attachment a = m.attachments.first.copyWith(
+          status: (p.remoteUrl != null) ? AttachmentStatus.uploaded : AttachmentStatus.uploading,
+        );
+        return m.copyWith(attachments: <Attachment>[a]);
+      }).toList(growable: false);
+      state = updated;
+      ref.notifyListeners();
+
+      if (p.remoteUrl != null) {
+        if (_rt != null && _rt!.enabled) {
+          unawaited(_sendOrQueue(<String, Object?>{
+            'type': 'attachment',
+            'id': attId,
+            'kind': draft.kind.name,
+            'mime': draft.mimeType,
+            'url': p.remoteUrl,
+            'ts': DateTime.now().toUtc().toIso8601String(),
+          }));
+        }
+        await saveMessages();
+      }
+    });
+  }
+
+  /// Forcer la reconnexion au relay
+  Future<void> reconnect() async {
+    print('[ChatController] 🔄 Manual reconnect requested');
+    
+    if (_rt == null) {
+      print('[ChatController] ❌ No relay service configured');
+      return;
+    }
+    
+    await _rt!.dispose();
+    
+    _rt = RealtimeService(url: AppEnv.relayWsUrl, room: AppEnv.relayRoom);
+    
+    await _rt!.connect();
+    
+    _connectionSub?.cancel();
+    _connectionSub = _rt!.connectionStatus.listen((bool isConnected) {
+      if (isConnected) {
+        print('[ChatController] ✅ Connected - processing queue...');
+        _processQueue();
+      } else {
+        print('[ChatController] 🔴 Disconnected');
+      }
+      ref.notifyListeners();
+    });
+    
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    if (_rt!.isConnected) {
+      print('[ChatController] 🔄 Processing queue after manual reconnect...');
+      await _processQueue();
+    }
+    
+    print('[ChatController] ✅ Reconnect complete');
+    ref.notifyListeners();
+  }
+
+  /// Démarrer l'enregistrement vocal
+  Future<bool> startRecordingVoice() async {
+    return await _audioRecorder.startRecording();
+  }
+
+  /// Arrêter l'enregistrement vocal et envoyer le message
+  Future<void> stopRecordingVoice() async {
+    final audioPath = await _audioRecorder.stopRecording();
+    
+    if (audioPath == null || audioPath.isEmpty) {
+      print('[ChatController] ❌ No audio recorded');
+      return;
+    }
+
+    final attId = DateTime.now().microsecondsSinceEpoch.toString();
+    final Attachment audioAtt = Attachment(
+      id: attId,
+      kind: AttachmentKind.audio,
+      mimeType: 'audio/m4a',
+      localPath: audioPath,
+      createdAt: DateTime.now().toUtc(),
+      status: AttachmentStatus.uploading,
+    );
+    
+    final ChatMessage msg = ChatMessage(
+      id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+      originalText: '',
+      translatedText: '',
+      isMe: true,
+      time: DateTime.now().toUtc(),
+      attachments: <Attachment>[audioAtt],
+    );
+    
+    state = <ChatMessage>[...state, msg];
+    
+    await saveMessages();
+    ref.notifyListeners();
+    
+    final AudioAttachmentDraft draft = AudioAttachmentDraft(
+      kind: AttachmentKind.audio,
+      sourcePath: audioPath,
+      mimeType: 'audio/m4a',
+    );
+    
+    _uploader.uploadAudio(draft).listen((UploadProgress p) async {
+      final List<ChatMessage> updated = state.map((m) {
+        if (m.id != msg.id) return m;
+        final Attachment a = m.attachments.first.copyWith(
+          status: (p.remoteUrl != null || p.base64Data != null) 
+              ? AttachmentStatus.uploaded 
+              : AttachmentStatus.uploading,
+        );
+        return m.copyWith(attachments: <Attachment>[a]);
+      }).toList(growable: false);
+      state = updated;
+      ref.notifyListeners();
+
+      if (p.remoteUrl != null || p.base64Data != null) {
+        if (_rt != null && _rt!.enabled) {
+          unawaited(_sendOrQueue(<String, Object?>{
+            'type': 'attachment',
+            'id': attId,
+            'kind': 'audio',
+            'mime': 'audio/m4a',
+            'url': p.remoteUrl,
+            if (p.base64Data != null) 'base64': p.base64Data,
+            'ts': DateTime.now().toUtc().toIso8601String(),
+          }));
+        }
+        await saveMessages();
+      }
+    });
+  }
+
+  /// Annuler l'enregistrement vocal en cours
+  Future<void> cancelRecordingVoice() async {
+    await _audioRecorder.cancelRecording();
   }
 }
 

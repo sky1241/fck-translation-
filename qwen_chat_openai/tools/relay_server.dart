@@ -99,7 +99,7 @@ Future<void> main(List<String> args) async {
       
       // ✅ STOCKER le message (sauf ping/pong)
       try {
-        final Map<String, dynamic> parsed = jsonDecode(text);
+        final Map<String, dynamic> parsed = jsonDecode(text) as Map<String, dynamic>;
         final String? msgType = parsed['type'] as String?;
         
         if (msgType != 'ping' && msgType != 'pong') {

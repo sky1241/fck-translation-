@@ -112,4 +112,26 @@ class AttachmentDraft {
   final int? estimatedBytes;
 }
 
+/// Draft for audio files (voice messages)
+class AudioAttachmentDraft {
+  AudioAttachmentDraft({
+    required this.kind,
+    required this.sourcePath,
+    required this.mimeType,
+  });
+
+  final AttachmentKind kind;
+  final String sourcePath;
+  final String mimeType;
+  
+  AttachmentDraft toAttachmentDraft() {
+    return AttachmentDraft(
+      kind: kind,
+      sourcePath: sourcePath,
+      mimeType: mimeType,
+      estimatedBytes: null,
+    );
+  }
+}
+
 

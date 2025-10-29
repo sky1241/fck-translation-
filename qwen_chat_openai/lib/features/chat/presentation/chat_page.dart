@@ -8,9 +8,11 @@ import 'widgets/attachment_bubble.dart';
 import '../data/models/attachment.dart';
 import '../../../core/network/badge_service.dart';
 import '../../../core/network/notification_service.dart';
+import '../../../core/env/app_env.dart';
+import 'photo_gallery_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
-  const ChatPage({super.key});
+  ChatPage({super.key});
 
   @override
   ConsumerState<ChatPage> createState() => _ChatPageState();
@@ -19,7 +21,6 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _listCtrl = ScrollController();
-  int _previousMessageCount = 0;
 
   @override
   void initState() {
@@ -42,15 +43,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       final notif = NotificationService();
       await notif.clearSummaryNotification();
     });
-    
-    // Auto-scroll listener pour les messages reçus via WebSocket
-    _listCtrl.addListener(() {
-      // Quand scroll atteint le bas (message lu) → clear badge
-      if (_listCtrl.hasClients && 
-          _listCtrl.position.pixels >= _listCtrl.position.maxScrollExtent - 100) {
-        BadgeService.clear();
-      }
-    });
   }
 
   @override
@@ -58,63 +50,51 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final controller = ref.watch(chatControllerProvider.notifier);
     final messages = ref.watch(chatControllerProvider);
     
-    // Auto-scroll quand un nouveau message arrive (envoi ou réception WebSocket)
-    if (messages.length > _previousMessageCount) {
-      _previousMessageCount = messages.length;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_listCtrl.hasClients && mounted) {
-          _listCtrl.animateTo(
-            _listCtrl.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-    }
+    // Surveiller le statut de connexion
+    final isConnected = controller.isConnected;
+    print('[ChatPage] BUILD - isConnected=$isConnected');
 
     // Badge count pour afficher le nombre de messages non lus
     final int badgeCount = ref.watch(badgeCountProvider);
+    
+    final String title = 'XiaoXin ${AppEnv.appVersion}';
+    
+    // Message de déconnexion selon la langue
+    final String disconnectMessage = controller.sourceLang == 'zh' 
+        ? '已断线 - 发送消息即可重新连接'
+        : 'Hors ligne - Envoyez un message pour vous reconnecter';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('XiaoXin'),
-        actions: <Widget>[
-          // Badge rouge avec compteur de messages non lus
-          Stack(
-            children: [
-              IconButton(
-                tooltip: controller.silentMode ? 'Mode normal' : 'Mode silencieux',
-                onPressed: controller.toggleSilentMode,
-                icon: Icon(controller.silentMode ? Icons.notifications_off : Icons.notifications),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title),
+            const SizedBox(width: 8),
+            // Point vert/rouge + status texte
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: isConnected ? Colors.green : Colors.red,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
               ),
-              if (badgeCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      '$badgeCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          // Bouton swap supprimé - détection automatique de langue
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isConnected ? 'online' : 'offline',
+              style: TextStyle(
+                fontSize: 10,
+                color: isConnected ? Colors.green.shade300 : Colors.red.shade300,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          // AppBar responsive - adapte la taille selon l'écran
+          ..._buildResponsiveActions(context, controller, isConnected),
         ],
       ),
       body: Column(
@@ -132,6 +112,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   child: const Text('OK'),
                 ),
               ],
+            ),
+          // Banderole de reconnexion quand hors ligne
+          if (!isConnected)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              color: Colors.orange.shade100,
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      disconnectMessage,
+                      style: TextStyle(
+                        color: Colors.orange.shade900,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           const SizedBox(height: 8),
           Expanded(
@@ -163,9 +166,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             hintText: controller.sourceLang == 'fr'
                 ? 'Écrire en français…'
                 : '用中文输入…',
-                onPickAttachment: () async {
-                  await ref.read(chatControllerProvider.notifier).pickAndSendAttachment();
-                },
+            onPickAttachment: null, // Désactivé - microphon uniquement
+            onRecordVoice: () async {
+              final notifier = ref.read(chatControllerProvider.notifier);
+              if (notifier.isRecordingVoice) {
+                await notifier.stopRecordingVoice();
+                return true;
+              } else {
+                return await notifier.startRecordingVoice();
+              }
+            },
+            isRecordingVoice: controller.isRecordingVoice,
+            recordingDuration: controller.recordingDuration,
             onSend: () async {
               final text = _textCtrl.text;
               _textCtrl.clear();
@@ -185,6 +197,146 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ),
     );
   }
+
+  /// Construire les boutons de l'AppBar de manière responsive
+  List<Widget> _buildResponsiveActions(BuildContext context, ChatController controller, bool isConnected) {
+    // Taille adaptative selon l'écran
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double buttonSize = screenWidth < 360 ? 20.0 : 24.0;
+    final double padding = screenWidth < 360 ? 6.0 : 8.0;
+    final double horizontalPadding = screenWidth < 360 ? 2.0 : 4.0;
+
+    return [
+      // Bouton Galerie Photo (❤️)
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: padding),
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.pink.shade400,
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute<Widget>(builder: (_) => const PhotoGalleryPage()),
+              );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: EdgeInsets.all(padding),
+              child: Icon(
+                Icons.favorite,
+                color: Colors.white,
+                size: buttonSize,
+              ),
+            ),
+          ),
+        ),
+      ),
+      // Bouton CAMÉRA (📷) - Prendre photo/vidéo
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: padding),
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.blue.shade600,
+          child: InkWell(
+            onTap: () async {
+              // Menu: Photo ou Vidéo (texte adapté selon la version)
+              final bool isChinese = AppEnv.defaultDirection == 'zh2fr';
+              showModalBottomSheet(
+                context: context,
+                builder: (context) => SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                        title: Text(isChinese ? '拍照' : 'Prendre une photo'),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await ref.read(chatControllerProvider.notifier).pickAndSendCameraPhoto();
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.videocam, color: Colors.red),
+                        title: Text(isChinese ? '录制视频' : 'Enregistrer une vidéo'),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await ref.read(chatControllerProvider.notifier).pickAndSendCameraVideo();
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.photo_library, color: Colors.green),
+                        title: Text(isChinese ? '从相册选择' : 'Choisir depuis la galerie'),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await ref.read(chatControllerProvider.notifier).pickAndSendAttachment();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: EdgeInsets.all(padding),
+              child: Icon(
+                Icons.camera_alt,
+                color: Colors.white,
+                size: buttonSize,
+              ),
+            ),
+          ),
+        ),
+      ),
+      // Bouton Notifications (🔔)
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: padding),
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(12),
+          color: controller.silentMode ? Colors.grey.shade600 : Colors.teal.shade400,
+          child: InkWell(
+            onTap: controller.toggleSilentMode,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: EdgeInsets.all(padding),
+              child: Icon(
+                controller.silentMode ? Icons.notifications_off : Icons.notifications,
+                color: Colors.white,
+                size: buttonSize,
+              ),
+            ),
+          ),
+        ),
+      ),
+      // Bouton Voice Message (🎤) - Déplacé dans ComposerBar
+      // Bouton Reconnexion (🔄) - Visible seulement si déconnecté
+      if (!isConnected)
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: padding),
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.orange.shade600,
+            child: InkWell(
+              onTap: () {
+                controller.reconnect();
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: EdgeInsets.all(padding),
+                child: Icon(
+                  Icons.refresh,
+                  color: Colors.white,
+                  size: buttonSize,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ];
+  }
 }
-
-

@@ -93,7 +93,7 @@ class Attachment {
   String toString() => jsonEncode(toJson());
 }
 
-enum AttachmentKind { image, video }
+enum AttachmentKind { image, video, audio }
 
 enum AttachmentStatus { pending, uploading, uploaded, failed }
 

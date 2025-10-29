@@ -73,7 +73,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
 
     // Badge count pour afficher le nombre de messages non lus
-    final badgeCount = ref.watch(badgeCountProvider);
+    final int badgeCount = ref.watch(badgeCountProvider);
 
     return Scaffold(
       appBar: AppBar(

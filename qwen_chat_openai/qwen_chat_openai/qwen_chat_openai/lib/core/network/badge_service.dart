@@ -57,5 +57,3 @@ class BadgeService {
     return Platform.isAndroid || Platform.isIOS;
   }
 }
-
-
