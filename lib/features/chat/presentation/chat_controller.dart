@@ -52,7 +52,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
   bool get isSending => _isSending;
   String? get lastError => _lastError;
   bool get silentMode => _silentMode;
-  bool get isConnected => _rt?.isConnected ?? false;
+  bool get isConnected => _rt != null && _rt!.isConnected;
   bool get isRecordingVoice => _audioRecorder.isRecording;
   int get recordingDuration => _audioRecorder.durationSeconds;
 
