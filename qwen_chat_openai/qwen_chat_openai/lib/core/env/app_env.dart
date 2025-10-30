@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 class AppEnv {
   static const String baseUrl = String.fromEnvironment(
     'OPENAI_BASE_URL',
@@ -49,23 +50,23 @@ class AppEnv {
 
   static void printConfig() {
     // ignore: avoid_print
-    print('[AppEnv] Configuration loaded:');
+    if (kDebugMode) debugPrint('[AppEnv] Configuration loaded:');
     // ignore: avoid_print
-    print('  baseUrl: $baseUrl');
+    if (kDebugMode) debugPrint('  baseUrl: $baseUrl');
     // ignore: avoid_print
-    print('  model: $model');
+    if (kDebugMode) debugPrint('  model: $model');
     // ignore: avoid_print
-    print('  mockMode: $mockMode');
+    if (kDebugMode) debugPrint('  mockMode: $mockMode');
     // ignore: avoid_print
-    print('  relayWsUrl: $relayWsUrl');
+    if (kDebugMode) debugPrint('  relayWsUrl: $relayWsUrl');
     // ignore: avoid_print
-    print('  relayRoom: $relayRoom');
+    if (kDebugMode) debugPrint('  relayRoom: $relayRoom');
     // ignore: avoid_print
-    print('  defaultDirection: $defaultDirection');
+    if (kDebugMode) debugPrint('  defaultDirection: $defaultDirection');
     // ignore: avoid_print
-    print('  defaultTone: $defaultTone');
+    if (kDebugMode) debugPrint('  defaultTone: $defaultTone');
     // ignore: avoid_print
-    print('  defaultPinyin: $defaultPinyin');
+    if (kDebugMode) debugPrint('  defaultPinyin: $defaultPinyin');
   }
 }
 

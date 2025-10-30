@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'chat_controller.dart';
@@ -52,7 +53,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     
     // Surveiller le statut de connexion
     final isConnected = controller.isConnected;
-    print('[ChatPage] BUILD - isConnected=$isConnected');
+    if (kDebugMode) debugPrint('[ChatPage] BUILD - isConnected=$isConnected');
 
     // Badge count pour afficher le nombre de messages non lus
     final int badgeCount = ref.watch(badgeCountProvider);

@@ -13,6 +13,7 @@ import '../../../core/network/realtime_service.dart';
 import '../../../core/network/notification_service.dart';
 import '../../../core/network/badge_service.dart';
 import '../../../core/media/attachment_picker_service.dart';
+import '../../../core/media/audio_recorder_service.dart';
 import '../data/models/attachment.dart';
 import '../../../core/network/upload/cloud_upload_service.dart';
 import '../../../core/network/upload/upload_service.dart';
@@ -41,6 +42,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
   RealtimeService? _rt;
   final NotificationService _notif = NotificationService();
   final AttachmentPickerService _picker = AttachmentPickerService();
+  final AudioRecorderService _audioRecorder = AudioRecorderService();
   late final UploadService _uploader = CloudUploadService(endpointBase: AppEnv.uploadBaseUrl);
 
   String get sourceLang => _sourceLang;
@@ -50,6 +52,9 @@ class ChatController extends Notifier<List<ChatMessage>> {
   bool get isSending => _isSending;
   String? get lastError => _lastError;
   bool get silentMode => _silentMode;
+  bool get isConnected => _rt?.isConnected ?? false;
+  bool get isRecordingVoice => _audioRecorder.isRecording;
+  int get recordingDuration => _audioRecorder.durationSeconds;
 
   @override
   List<ChatMessage> build() {
@@ -395,6 +400,95 @@ class ChatController extends Notifier<List<ChatMessage>> {
     } catch (e) {
       _lastError = e.toString();
       ref.notifyListeners();
+    }
+  }
+
+  /// Reconnecter le service realtime
+  void reconnect() {
+    if (_rt != null && AppEnv.relayRoom.isNotEmpty) {
+      _rt!.disconnect();
+      _rt = RealtimeService(url: AppEnv.relayWsUrl, room: AppEnv.relayRoom);
+      _rt!.connect();
+    }
+  }
+
+  /// Démarrer l'enregistrement vocal
+  Future<bool> startRecordingVoice() async {
+    return await _audioRecorder.startRecording();
+  }
+
+  /// Arrêter l'enregistrement vocal et envoyer
+  Future<void> stopRecordingVoice() async {
+    final path = await _audioRecorder.stopRecording();
+    if (path != null) {
+      // Envoyer le fichier audio comme pièce jointe
+      final AttachmentDraft? draft = await _picker.pickFile(path);
+      if (draft != null) {
+        await _sendAttachmentDraft(draft);
+      }
+    }
+  }
+
+  /// Envoyer une pièce jointe (utilitaire)
+  Future<void> _sendAttachmentDraft(AttachmentDraft draft) async {
+    final String attId = DateTime.now().microsecondsSinceEpoch.toString();
+    final Attachment pending = Attachment(
+      id: attId,
+      kind: draft.kind,
+      mimeType: draft.mimeType,
+      localPath: draft.sourcePath,
+      createdAt: DateTime.now().toUtc(),
+      status: AttachmentStatus.uploading,
+    );
+    final ChatMessage msg = ChatMessage(
+      id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+      originalText: '',
+      translatedText: '',
+      isMe: true,
+      time: DateTime.now().toUtc(),
+      attachments: <Attachment>[pending],
+    );
+    state = <ChatMessage>[...state, msg];
+    ref.notifyListeners();
+
+    _uploader.upload(draft).listen((UploadProgress p) async {
+      final List<ChatMessage> updated = state.map((m) {
+        if (m.id != msg.id) return m;
+        final Attachment a = m.attachments.first.copyWith(
+          status: (p.remoteUrl != null) ? AttachmentStatus.uploaded : AttachmentStatus.uploading,
+        );
+        return m.copyWith(attachments: <Attachment>[a]);
+      }).toList(growable: false);
+      state = updated;
+      ref.notifyListeners();
+
+      if (p.remoteUrl != null && _rt != null && _rt!.enabled) {
+        unawaited(_rt!.send(<String, Object?>{
+          'type': 'attachment',
+          'id': attId,
+          'kind': draft.kind.name,
+          'mime': draft.mimeType,
+          'url': p.remoteUrl,
+          'ts': DateTime.now().toUtc().toIso8601String(),
+        }));
+        await saveMessages();
+      }
+    });
+  }
+
+  /// Prendre une photo avec la caméra et l'envoyer
+  Future<void> pickAndSendCameraPhoto() async {
+    final AttachmentDraft? draft = await _picker.pickCameraImage();
+    if (draft != null) {
+      await _sendAttachmentDraft(draft);
+    }
+  }
+
+  /// Prendre une vidéo avec la caméra et l'envoyer
+  Future<void> pickAndSendCameraVideo() async {
+    final AttachmentDraft? draft = await _picker.pickCameraVideo();
+    if (draft != null) {
+      await _sendAttachmentDraft(draft);
     }
   }
 }

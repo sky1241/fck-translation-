@@ -1,11 +1,11 @@
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, debugPrint;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Provider pour rendre le badge count réactif dans l'UI
-final badgeCountProvider = StateProvider<int>((ref) => 0);
+final badgeCountProvider = Provider<int>((ref) => BadgeService.currentCount);
 
 class BadgeService {
   BadgeService._();
@@ -24,15 +24,15 @@ class BadgeService {
     _unreadCount = 0;
     // Update provider pour UI réactive
     if (_container != null) {
-      _container!.read(badgeCountProvider.notifier).state = 0;
+      _container!.invalidate(badgeCountProvider);
     }
     // Clear visual badge on app icon using native ShortcutBadger
     try {
-      print('[BadgeService] Clearing badge via native plugin');
+      if (kDebugMode) debugPrint('[BadgeService] Clearing badge via native plugin');
       final bool? success = await _channel.invokeMethod<bool>('removeBadge');
-      print('[BadgeService] Badge clear result: $success');
+      if (kDebugMode) debugPrint('[BadgeService] Badge clear result: $success');
     } catch (e) {
-      print('[BadgeService] Error clearing badge: $e');
+      if (kDebugMode) debugPrint('[BadgeService] Error clearing badge: $e');
     }
   }
 
@@ -40,15 +40,15 @@ class BadgeService {
     _unreadCount = (_unreadCount + 1).clamp(0, 9999);
     // Update provider pour UI réactive
     if (_container != null) {
-      _container!.read(badgeCountProvider.notifier).state = _unreadCount;
+      _container!.invalidate(badgeCountProvider);
     }
-    print('[BadgeService] Incrementing badge to $_unreadCount via native plugin');
+    if (kDebugMode) debugPrint('[BadgeService] Incrementing badge to $_unreadCount via native plugin');
     // Update visual badge on app icon using native ShortcutBadger
     try {
       final bool? success = await _channel.invokeMethod<bool>('setBadge', {'count': _unreadCount});
-      print('[BadgeService] Badge set to $_unreadCount, result: $success');
+      if (kDebugMode) debugPrint('[BadgeService] Badge set to $_unreadCount, result: $success');
     } catch (e) {
-      print('[BadgeService] Error setting badge: $e');
+      if (kDebugMode) debugPrint('[BadgeService] Error setting badge: $e');
     }
   }
 

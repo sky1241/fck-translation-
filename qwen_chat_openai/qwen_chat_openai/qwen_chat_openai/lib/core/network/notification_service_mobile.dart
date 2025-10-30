@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'badge_service.dart';
 
@@ -68,7 +69,7 @@ class NotificationService {
       final NotificationDetails summaryDetails = NotificationDetails(android: summaryAndroid);
       await _fln.show(_summaryNotificationId, summaryTitle, 'Ouvrez XiaoXin002', summaryDetails);
     } catch (e) {
-      print('[NotificationService] Error showing summary notification: $e');
+      if (kDebugMode) debugPrint('[NotificationService] Error showing summary notification: $e');
     }
   }
 

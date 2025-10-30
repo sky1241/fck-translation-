@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/photo_gallery_item.dart';
@@ -63,13 +64,13 @@ class PhotoGalleryController extends Notifier<PhotoGalleryState> {
 
   /// Charger toutes les photos
   Future<void> loadPhotos() async {
-    print('[PhotoGalleryController] 🔵 loadPhotos called');
+    if (kDebugMode) debugPrint('[PhotoGalleryController] 🔵 loadPhotos called');
     state = state.copyWith(isLoading: true, error: null);
 
     try {
       final photos = await _photoRepository.getAllPhotos();
       final count = photos.length;
-      print('[PhotoGalleryController] 📸 Loaded ${count} photos from repository');
+      if (kDebugMode) debugPrint('[PhotoGalleryController] 📸 Loaded ${count} photos from repository');
       
       final cacheBytes = await _cacheService.getCacheSize();
       final cacheSize = _cacheService.formatCacheSize(cacheBytes);
@@ -81,9 +82,9 @@ class PhotoGalleryController extends Notifier<PhotoGalleryState> {
         isLoading: false,
       );
       
-      print('[PhotoGalleryController] ✅ State updated with ${count} photos');
+      if (kDebugMode) debugPrint('[PhotoGalleryController] ✅ State updated with ${count} photos');
     } catch (e) {
-      print('[PhotoGalleryController] ❌ Error loading photos: $e');
+      if (kDebugMode) debugPrint('[PhotoGalleryController] ❌ Error loading photos: $e');
       state = state.copyWith(
         isLoading: false,
         error: 'Erreur lors du chargement des photos',

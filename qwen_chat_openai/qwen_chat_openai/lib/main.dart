@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,11 +15,11 @@ Future<void> main() async {
   AppEnv.printConfig();
   
   // ✅ IMPORTANT: Demander les permissions au démarrage
-  print('🔐 Requesting permissions...');
+  if (kDebugMode) debugPrint('🔐 Requesting permissions...');
   try {
     await PermissionService.requestAllPermissions();
   } catch (e) {
-    print('⚠️ Error requesting permissions: $e');
+    if (kDebugMode) debugPrint('⚠️ Error requesting permissions: $e');
     // Ne pas bloquer le démarrage
   }
   

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'chat_controller.dart';
@@ -12,7 +13,7 @@ import '../../../core/env/app_env.dart';
 import 'photo_gallery_page.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
-  ChatPage({super.key});
+  const ChatPage({super.key});
 
   @override
   ConsumerState<ChatPage> createState() => _ChatPageState();
@@ -52,7 +53,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     
     // Surveiller le statut de connexion
     final isConnected = controller.isConnected;
-    print('[ChatPage] BUILD - isConnected=$isConnected');
+    if (kDebugMode) debugPrint('[ChatPage] BUILD - isConnected=$isConnected');
 
     final String title = 'XiaoXin ${AppEnv.appVersion}';
     

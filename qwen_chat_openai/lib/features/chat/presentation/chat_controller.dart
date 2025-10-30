@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -87,10 +88,10 @@ class ChatController extends Notifier<List<ChatMessage>> {
       // Listen to connection status changes
       _connectionSub = _rt!.connectionStatus.listen((bool isConnected) {
         if (isConnected) {
-          print('[ChatController] ✅ Connected - processing queue...');
+          if (kDebugMode) debugPrint('[ChatController] ✅ Connected - processing queue...');
           _processQueue();
         } else {
-          print('[ChatController] 🔴 Disconnected');
+          if (kDebugMode) debugPrint('[ChatController] 🔴 Disconnected');
         }
         // Notifier l'UI du changement de statut de connexion
         ref.notifyListeners();
@@ -429,15 +430,15 @@ class ChatController extends Notifier<List<ChatMessage>> {
     if (_rt == null || !_rt!.enabled) return;
     
     final String queuedId = await _messageQueue.enqueue(message);
-    print('[ChatController] 📝 Message queued (ID: $queuedId, ${_messageQueue.currentSize} pending)');
+    if (kDebugMode) debugPrint('[ChatController] 📝 Message queued (ID: $queuedId, ${_messageQueue.currentSize} pending)');
     
     final bool sent = await _rt!.send(message);
     
     if (sent) {
       await _messageQueue.remove(queuedId);
-      print('[ChatController] ✅ Message $queuedId sent & removed from queue');
+      if (kDebugMode) debugPrint('[ChatController] ✅ Message $queuedId sent & removed from queue');
     } else {
-      print('[ChatController] ❌ Message $queuedId failed, staying in queue for retry');
+      if (kDebugMode) debugPrint('[ChatController] ❌ Message $queuedId failed, staying in queue for retry');
     }
   }
 
@@ -446,15 +447,15 @@ class ChatController extends Notifier<List<ChatMessage>> {
     final messages = _messageQueue.getAll();
     
     if (messages.isEmpty) {
-      print('[ChatController] Queue empty');
+      if (kDebugMode) debugPrint('[ChatController] Queue empty');
       return;
     }
     
-    print('[ChatController] Processing ${messages.length} queued messages...');
+    if (kDebugMode) debugPrint('[ChatController] Processing ${messages.length} queued messages...');
     
     for (final queuedMsg in messages) {
       if (queuedMsg.retryCount > 5) {
-        print('[ChatController] Message ${queuedMsg.id} exceeded retry limit, removing');
+        if (kDebugMode) debugPrint('[ChatController] Message ${queuedMsg.id} exceeded retry limit, removing');
         await _messageQueue.remove(queuedMsg.id);
         continue;
       }
@@ -462,17 +463,17 @@ class ChatController extends Notifier<List<ChatMessage>> {
       final bool sent = await _rt!.send(queuedMsg.message);
       
       if (sent) {
-        print('[ChatController] ✅ Message ${queuedMsg.id} sent');
+        if (kDebugMode) debugPrint('[ChatController] ✅ Message ${queuedMsg.id} sent');
         await _messageQueue.remove(queuedMsg.id);
       } else {
-        print('[ChatController] ❌ Message ${queuedMsg.id} failed, retry later');
+        if (kDebugMode) debugPrint('[ChatController] ❌ Message ${queuedMsg.id} failed, retry later');
         await _messageQueue.incrementRetry(queuedMsg.id);
       }
       
       await Future.delayed(const Duration(milliseconds: 200));
     }
     
-    print('[ChatController] Queue processed (${_messageQueue.currentSize} remaining)');
+    if (kDebugMode) debugPrint('[ChatController] Queue processed (${_messageQueue.currentSize} remaining)');
   }
   
   /// Prendre une photo avec la caméra et l'envoyer
@@ -539,7 +540,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
               status: PhotoStatus.cached,
             ));
           } catch (e) {
-            print('[ChatController] Error saving photo to gallery: $e');
+            if (kDebugMode) debugPrint('[ChatController] Error saving photo to gallery: $e');
           }
         }
       }
@@ -602,10 +603,10 @@ class ChatController extends Notifier<List<ChatMessage>> {
 
   /// Forcer la reconnexion au relay
   Future<void> reconnect() async {
-    print('[ChatController] 🔄 Manual reconnect requested');
+    if (kDebugMode) debugPrint('[ChatController] 🔄 Manual reconnect requested');
     
     if (_rt == null) {
-      print('[ChatController] ❌ No relay service configured');
+      if (kDebugMode) debugPrint('[ChatController] ❌ No relay service configured');
       return;
     }
     
@@ -618,10 +619,10 @@ class ChatController extends Notifier<List<ChatMessage>> {
     _connectionSub?.cancel();
     _connectionSub = _rt!.connectionStatus.listen((bool isConnected) {
       if (isConnected) {
-        print('[ChatController] ✅ Connected - processing queue...');
+        if (kDebugMode) debugPrint('[ChatController] ✅ Connected - processing queue...');
         _processQueue();
       } else {
-        print('[ChatController] 🔴 Disconnected');
+        if (kDebugMode) debugPrint('[ChatController] 🔴 Disconnected');
       }
       ref.notifyListeners();
     });
@@ -629,11 +630,11 @@ class ChatController extends Notifier<List<ChatMessage>> {
     await Future.delayed(const Duration(milliseconds: 500));
     
     if (_rt!.isConnected) {
-      print('[ChatController] 🔄 Processing queue after manual reconnect...');
+      if (kDebugMode) debugPrint('[ChatController] 🔄 Processing queue after manual reconnect...');
       await _processQueue();
     }
     
-    print('[ChatController] ✅ Reconnect complete');
+    if (kDebugMode) debugPrint('[ChatController] ✅ Reconnect complete');
     ref.notifyListeners();
   }
 
@@ -647,7 +648,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
     final audioPath = await _audioRecorder.stopRecording();
     
     if (audioPath == null || audioPath.isEmpty) {
-      print('[ChatController] ❌ No audio recorded');
+      if (kDebugMode) debugPrint('[ChatController] ❌ No audio recorded');
       return;
     }
 

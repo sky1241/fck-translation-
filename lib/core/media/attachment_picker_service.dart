@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:image_picker/image_picker.dart';
 import '../../features/chat/data/models/attachment.dart';
 
@@ -79,11 +81,38 @@ class AttachmentPickerService {
     );
   }
 
+  /// Créer un draft depuis un fichier existant (pour audio)
+  Future<AttachmentDraft?> pickFile(String filePath) async {
+    final file = File(filePath);
+    if (!await file.exists()) return null;
+    final String mime = _guessMime(filePath, fallback: 'audio/m4a');
+    int? size;
+    try {
+      size = await file.length();
+    } catch (_) {
+      size = null;
+    }
+    return AttachmentDraft(
+      kind: AttachmentKind.audio,
+      sourcePath: filePath,
+      mimeType: mime,
+      estimatedBytes: size,
+    );
+  }
+
+  /// Alias pour pickImageFromCamera
+  Future<AttachmentDraft?> pickCameraImage() => pickImageFromCamera();
+
+  /// Alias pour pickVideoFromCamera
+  Future<AttachmentDraft?> pickCameraVideo() => pickVideoFromCamera();
+
   String _guessMime(String path, {required String fallback}) {
     final String p = path.toLowerCase();
     if (p.endsWith('.png')) return 'image/png';
     if (p.endsWith('.webp')) return 'image/webp';
     if (p.endsWith('.jpg') || p.endsWith('.jpeg')) return 'image/jpeg';
+    if (p.endsWith('.m4a') || p.endsWith('.aac')) return 'audio/m4a';
+    if (p.endsWith('.mp4')) return 'video/mp4';
     return fallback;
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -24,7 +25,7 @@ Future<void> main(List<String> args) async {
   final int port = int.parse(Platform.environment['RELAY_PORT'] ?? (args.isNotEmpty ? args.first : '8765'));
   final HttpServer server = await HttpServer.bind(InternetAddress.anyIPv4, port);
   // ignore: avoid_print
-  print('Relay listening on ws://0.0.0.0:$port (MSG HISTORY: 2000 msgs, 5 days, Photos NEVER deleted)');
+  if (kDebugMode) debugPrint('Relay listening on ws://0.0.0.0:$port (MSG HISTORY: 2000 msgs, 5 days, Photos NEVER deleted)');
 
   final Map<String, Set<WebSocket>> roomToSockets = <String, Set<WebSocket>>{};
   final Map<String, List<StoredMessage>> roomToMessages = <String, List<StoredMessage>>{};
@@ -50,7 +51,7 @@ Future<void> main(List<String> args) async {
     }
     
     if (cleaned > 0) {
-      print('[relay] Cleaned $cleaned old text messages (photos kept forever)');
+      if (kDebugMode) debugPrint('[relay] Cleaned $cleaned old text messages (photos kept forever)');
     }
   });
 
@@ -76,17 +77,17 @@ Future<void> main(List<String> args) async {
     roomToMessages.putIfAbsent(room, () => <StoredMessage>[]);
     
     // ignore: avoid_print
-    print('[relay][$room] connected (${roomToSockets[room]!.length})');
+    if (kDebugMode) debugPrint('[relay][$room] connected (${roomToSockets[room]!.length})');
     
     // ✅ ENVOYER L'HISTORIQUE DES MESSAGES à la reconnexion
     final List<StoredMessage> history = roomToMessages[room]!;
     if (history.isNotEmpty) {
-      print('[relay][$room] Sending ${history.length} stored messages to new client');
+      if (kDebugMode) debugPrint('[relay][$room] Sending ${history.length} stored messages to new client');
       for (final StoredMessage msg in history) {
         try {
           socket.add(msg.text);
         } catch (e) {
-          print('[relay][$room] Error sending history: $e');
+          if (kDebugMode) debugPrint('[relay][$room] Error sending history: $e');
         }
       }
     }
@@ -149,18 +150,18 @@ Future<void> main(List<String> args) async {
           try {
             s.add(text);
           } catch (e) {
-            print('[relay][$room] Error broadcasting: $e');
+            if (kDebugMode) debugPrint('[relay][$room] Error broadcasting: $e');
           }
         }
       }
     }, onDone: () {
       roomToSockets[room]!.remove(socket);
       // ignore: avoid_print
-      print('[relay][$room] disconnected (${roomToSockets[room]!.length})');
+      if (kDebugMode) debugPrint('[relay][$room] disconnected (${roomToSockets[room]!.length})');
     }, onError: (_) {
       roomToSockets[room]!.remove(socket);
       // ignore: avoid_print
-      print('[relay][$room] error; removed');
+      if (kDebugMode) debugPrint('[relay][$room] error; removed');
     });
   }
 }

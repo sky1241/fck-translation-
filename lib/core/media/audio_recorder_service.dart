@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'dart:io';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
@@ -26,20 +27,20 @@ class AudioRecorderService {
   /// Démarrer l'enregistrement
   Future<bool> startRecording() async {
     if (_isRecording) {
-      print('[AudioRecorder] ⚠️ Already recording');
+      if (kDebugMode) debugPrint('[AudioRecorder] ⚠️ Already recording');
       return false;
     }
     
     // Vérifier la permission
     if (!await checkPermission()) {
-      print('[AudioRecorder] ❌ Microphone permission denied');
+      if (kDebugMode) debugPrint('[AudioRecorder] ❌ Microphone permission denied');
       return false;
     }
 
     try {
       // Vérifier que le recorder est disponible
       if (await _recorder.hasPermission() != true) {
-        print('[AudioRecorder] ❌ No recording permission');
+        if (kDebugMode) debugPrint('[AudioRecorder] ❌ No recording permission');
         return false;
       }
 
@@ -64,13 +65,13 @@ class AudioRecorderService {
       // Timer pour suivre la durée
       _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         _durationSeconds++;
-        print('[AudioRecorder] 🎤 Recording: ${_durationSeconds}s');
+        if (kDebugMode) debugPrint('[AudioRecorder] 🎤 Recording: ${_durationSeconds}s');
       });
       
-      print('[AudioRecorder] ✅ Started recording: $_currentPath');
+      if (kDebugMode) debugPrint('[AudioRecorder] ✅ Started recording: $_currentPath');
       return true;
     } catch (e) {
-      print('[AudioRecorder] ❌ Error starting recording: $e');
+      if (kDebugMode) debugPrint('[AudioRecorder] ❌ Error starting recording: $e');
       return false;
     }
   }
@@ -78,7 +79,7 @@ class AudioRecorderService {
   /// Arrêter l'enregistrement et retourner le chemin du fichier
   Future<String?> stopRecording() async {
     if (!_isRecording) {
-      print('[AudioRecorder] ⚠️ Not recording');
+      if (kDebugMode) debugPrint('[AudioRecorder] ⚠️ Not recording');
       return null;
     }
     
@@ -90,7 +91,7 @@ class AudioRecorderService {
       _durationTimer?.cancel();
       _durationTimer = null;
       
-      print('[AudioRecorder] ✅ Stopped recording: $path (duration: ${_durationSeconds}s)');
+      if (kDebugMode) debugPrint('[AudioRecorder] ✅ Stopped recording: $path (duration: ${_durationSeconds}s)');
       
       final finalPath = path ?? _currentPath;
       _durationSeconds = 0;
@@ -98,7 +99,7 @@ class AudioRecorderService {
       
       return finalPath;
     } catch (e) {
-      print('[AudioRecorder] ❌ Error stopping recording: $e');
+      if (kDebugMode) debugPrint('[AudioRecorder] ❌ Error stopping recording: $e');
       return null;
     }
   }
@@ -121,19 +122,19 @@ class AudioRecorderService {
               final file = File(filePath);
               if (await file.exists()) {
                 await file.delete();
-                print('[AudioRecorder] 🗑️ Deleted temp file: $filePath');
+                if (kDebugMode) debugPrint('[AudioRecorder] 🗑️ Deleted temp file: $filePath');
               }
             }
           } catch (e) {
-            print('[AudioRecorder] ⚠️ Error deleting temp file: $e');
+            if (kDebugMode) debugPrint('[AudioRecorder] ⚠️ Error deleting temp file: $e');
           }
         }
         
         _currentPath = null;
         _durationSeconds = 0;
-        print('[AudioRecorder] 📛 Recording canceled');
+        if (kDebugMode) debugPrint('[AudioRecorder] 📛 Recording canceled');
       } catch (e) {
-        print('[AudioRecorder] Error canceling: $e');
+        if (kDebugMode) debugPrint('[AudioRecorder] Error canceling: $e');
         _isRecording = false;
         _durationTimer?.cancel();
         _durationTimer = null;

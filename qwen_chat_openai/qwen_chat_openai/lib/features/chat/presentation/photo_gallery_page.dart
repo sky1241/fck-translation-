@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -216,7 +217,7 @@ class _PhotoGalleryPageState extends ConsumerState<PhotoGalleryPage> {
 
   /// Afficher le viewer plein écran avec le package photo_view
   void _showPhotoViewer(BuildContext context, List<PhotoGalleryItem> photos, int initialIndex) {
-    print('[PhotoGalleryPage] 🖼️ Opening PhotoViewGallery with ${photos.length} photos, index $initialIndex');
+    if (kDebugMode) debugPrint('[PhotoGalleryPage] 🖼️ Opening PhotoViewGallery with ${photos.length} photos, index $initialIndex');
     
     Navigator.push(
       context,
@@ -233,10 +234,10 @@ class _PhotoGalleryPageState extends ConsumerState<PhotoGalleryPage> {
             pageController: PageController(initialPage: initialIndex),
             builder: (context, index) {
               final photo = photos[index];
-              print('[PhotoViewGallery] 📸 Building item $index - photo ${photo.id}');
-              print('[PhotoViewGallery] 🔍 photo.url length: ${photo.url.length} chars');
-              print('[PhotoViewGallery] 🔍 photo.url starts with: ${photo.url.substring(0, photo.url.length > 50 ? 50 : photo.url.length)}');
-              print('[PhotoViewGallery] 🔍 photo.thumbnail: ${photo.thumbnail != null ? "exists (${photo.thumbnail!.length} chars)" : "null"}');
+              if (kDebugMode) debugPrint('[PhotoViewGallery] 📸 Building item $index - photo ${photo.id}');
+              if (kDebugMode) debugPrint('[PhotoViewGallery] 🔍 photo.url length: ${photo.url.length} chars');
+              if (kDebugMode) debugPrint('[PhotoViewGallery] 🔍 photo.url starts with: ${photo.url.substring(0, photo.url.length > 50 ? 50 : photo.url.length)}');
+              if (kDebugMode) debugPrint('[PhotoViewGallery] 🔍 photo.thumbnail: ${photo.thumbnail != null ? "exists (${photo.thumbnail!.length} chars)" : "null"}');
               
               // Priorité : url (base64 JPEG) > thumbnail
               final String imageSource = photo.url.isNotEmpty ? photo.url : (photo.thumbnail ?? '');
@@ -247,17 +248,17 @@ class _PhotoGalleryPageState extends ConsumerState<PhotoGalleryPage> {
                 try {
                   final base64Data = imageSource.split(',').last;
                   imageBytes = base64Decode(base64Data);
-                  print('[PhotoViewGallery] ✅ Decoded ${imageBytes.length} bytes for photo $index');
+                  if (kDebugMode) debugPrint('[PhotoViewGallery] ✅ Decoded ${imageBytes.length} bytes for photo $index');
                 } catch (e) {
-                  print('[PhotoViewGallery] ❌ Failed to decode base64: $e');
+                  if (kDebugMode) debugPrint('[PhotoViewGallery] ❌ Failed to decode base64: $e');
                 }
               } else {
-                print('[PhotoViewGallery] ⚠️ imageSource does not start with data:image/ : $imageSource');
+                if (kDebugMode) debugPrint('[PhotoViewGallery] ⚠️ imageSource does not start with data:image/ : $imageSource');
               }
               
               // Fallback : icon si pas d'image
               if (imageBytes == null) {
-                print('[PhotoViewGallery] ⚠️ No valid image bytes, showing error icon');
+                if (kDebugMode) debugPrint('[PhotoViewGallery] ⚠️ No valid image bytes, showing error icon');
                 return PhotoViewGalleryPageOptions.customChild(
                   child: Center(
                     child: Column(
@@ -285,7 +286,7 @@ class _PhotoGalleryPageState extends ConsumerState<PhotoGalleryPage> {
                 maxScale: PhotoViewComputedScale.covered * 2,
                 heroAttributes: PhotoViewHeroAttributes(tag: photo.id),
                 errorBuilder: (context, error, stackTrace) {
-                  print('[PhotoViewGallery] ❌ MemoryImage error: $error');
+                  if (kDebugMode) debugPrint('[PhotoViewGallery] ❌ MemoryImage error: $error');
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'dart:convert';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -34,10 +35,10 @@ class RealtimeService {
         ? _url
         : AppEnv.relayWsUrl;
     // ignore: avoid_print
-    print('[relay] _url=$_url, AppEnv.relayWsUrl=${AppEnv.relayWsUrl}, effectiveUrl=$effectiveUrl, room=$_room');
+    if (kDebugMode) debugPrint('[relay] _url=$_url, AppEnv.relayWsUrl=${AppEnv.relayWsUrl}, effectiveUrl=$effectiveUrl, room=$_room');
     final Uri uri = Uri.parse('$effectiveUrl?room=${Uri.encodeComponent(_room)}');
     // ignore: avoid_print
-    print('[relay] connecting to $uri');
+    if (kDebugMode) debugPrint('[relay] connecting to $uri');
     
     try {
       _channel = WebSocketChannel.connect(uri);
@@ -47,7 +48,7 @@ class RealtimeService {
         if (!_isConnected) {
           _isConnected = true;
           _connectionCtrl.add(true);
-          print('[relay] ✅ Connected (first data received)');
+          if (kDebugMode) debugPrint('[relay] ✅ Connected (first data received)');
         }
         
         try {
@@ -56,7 +57,7 @@ class RealtimeService {
               ? data
               : utf8.decode(data as List<int>, allowMalformed: true);
           // ignore: avoid_print
-          print('[relay][in] $text');
+          if (kDebugMode) debugPrint('[relay][in] $text');
           final Map<String, dynamic> map = jsonDecode(text) as Map<String, dynamic>;
           _incomingCtrl.add(map);
         } catch (_) {
@@ -70,10 +71,10 @@ class RealtimeService {
       if (_channel != null && !_isConnected) {
         _isConnected = true;
         _connectionCtrl.add(true);
-        print('[relay] ✅ Connected (timeout)');
+        if (kDebugMode) debugPrint('[relay] ✅ Connected (timeout)');
       }
     } catch (e) {
-      print('[relay] ❌ Connection error: $e');
+      if (kDebugMode) debugPrint('[relay] ❌ Connection error: $e');
       _onDisconnect();
     }
   }
@@ -85,7 +86,7 @@ class RealtimeService {
     if (_isConnected) {
       _isConnected = false;
       _connectionCtrl.add(false);
-      print('[relay] 🔴 Disconnected');
+      if (kDebugMode) debugPrint('[relay] 🔴 Disconnected');
     }
   }
 
@@ -94,25 +95,25 @@ class RealtimeService {
     // simple backoff reconnect
     Future<void>.delayed(const Duration(seconds: 3), () {
       // ignore: avoid_print
-      print('[relay] 🔄 Reconnecting...');
+      if (kDebugMode) debugPrint('[relay] 🔄 Reconnecting...');
       connect();
     });
   }
 
   Future<bool> send(Map<String, Object?> payload) async {
     if (_channel == null || !_isConnected) {
-      print('[relay][out] ❌ Not connected, message queued');
+      if (kDebugMode) debugPrint('[relay][out] ❌ Not connected, message queued');
       return false;
     }
     
     try {
       final String text = jsonEncode(payload);
       // ignore: avoid_print
-      print('[relay][out] $text');
+      if (kDebugMode) debugPrint('[relay][out] $text');
       _channel!.sink.add(text);
       return true;
     } catch (e) {
-      print('[relay][out] ❌ Send error: $e');
+      if (kDebugMode) debugPrint('[relay][out] ❌ Send error: $e');
       return false;
     }
   }

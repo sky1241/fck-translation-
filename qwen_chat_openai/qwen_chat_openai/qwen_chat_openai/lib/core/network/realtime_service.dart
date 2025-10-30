@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'dart:async';
 import 'dart:convert';
 
@@ -28,10 +29,10 @@ class RealtimeService {
         ? _url
         : AppEnv.relayWsUrl;
     // ignore: avoid_print
-    print('[relay] _url=$_url, AppEnv.relayWsUrl=${AppEnv.relayWsUrl}, effectiveUrl=$effectiveUrl, room=$_room');
+    if (kDebugMode) debugPrint('[relay] _url=$_url, AppEnv.relayWsUrl=${AppEnv.relayWsUrl}, effectiveUrl=$effectiveUrl, room=$_room');
     final Uri uri = Uri.parse('$effectiveUrl?room=${Uri.encodeComponent(_room)}');
     // ignore: avoid_print
-    print('[relay] connecting to $uri');
+    if (kDebugMode) debugPrint('[relay] connecting to $uri');
     _channel = WebSocketChannel.connect(uri);
     _sub = _channel!.stream.listen((dynamic data) {
       try {
@@ -40,7 +41,7 @@ class RealtimeService {
             ? data
             : utf8.decode(data as List<int>, allowMalformed: true);
         // ignore: avoid_print
-        print('[relay][in] $text');
+        if (kDebugMode) debugPrint('[relay][in] $text');
         final Map<String, dynamic> map = jsonDecode(text) as Map<String, dynamic>;
         _incomingCtrl.add(map);
       } catch (_) {
@@ -60,7 +61,7 @@ class RealtimeService {
     // simple backoff reconnect
     Future<void>.delayed(const Duration(seconds: 2), () {
       // ignore: avoid_print
-      print('[relay] reconnecting...');
+      if (kDebugMode) debugPrint('[relay] reconnecting...');
       connect();
     });
   }
@@ -69,7 +70,7 @@ class RealtimeService {
     if (_channel == null) return;
     final String text = jsonEncode(payload);
     // ignore: avoid_print
-    print('[relay][out] $text');
+    if (kDebugMode) debugPrint('[relay][out] $text');
     _channel!.sink.add(text);
   }
 

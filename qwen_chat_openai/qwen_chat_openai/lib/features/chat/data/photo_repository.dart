@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,27 +11,27 @@ class PhotoRepository implements IPhotoRepository {
 
   @override
   Future<void> savePhoto(PhotoGalleryItem photo) async {
-    print('[PhotoRepository] 🔵 savePhoto called: ${photo.id}');
-    print('[PhotoRepository]    - url: ${photo.url}');
-    print('[PhotoRepository]    - localPath: ${photo.localPath}');
-    print('[PhotoRepository]    - isFromMe: ${photo.isFromMe}');
+    if (kDebugMode) debugPrint('[PhotoRepository] 🔵 savePhoto called: ${photo.id}');
+    if (kDebugMode) debugPrint('[PhotoRepository]    - url: ${photo.url}');
+    if (kDebugMode) debugPrint('[PhotoRepository]    - localPath: ${photo.localPath}');
+    if (kDebugMode) debugPrint('[PhotoRepository]    - isFromMe: ${photo.isFromMe}');
     
     final sp = await SharedPreferences.getInstance();
-    print('[PhotoRepository] ✅ SharedPreferences loaded');
+    if (kDebugMode) debugPrint('[PhotoRepository] ✅ SharedPreferences loaded');
     
     final photos = await getAllPhotos();
-    print('[PhotoRepository] 📦 Current photos: ${photos.length}');
+    if (kDebugMode) debugPrint('[PhotoRepository] 📦 Current photos: ${photos.length}');
     
     // Vérifier si la photo existe déjà
     final index = photos.indexWhere((p) => p.id == photo.id);
     if (index != -1) {
       // Mettre à jour
       photos[index] = photo;
-      print('[PhotoRepository] 🔄 Photo updated at index $index');
+      if (kDebugMode) debugPrint('[PhotoRepository] 🔄 Photo updated at index $index');
     } else {
       // Ajouter
       photos.add(photo);
-      print('[PhotoRepository] ➕ Photo added, total: ${photos.length}');
+      if (kDebugMode) debugPrint('[PhotoRepository] ➕ Photo added, total: ${photos.length}');
     }
     
     // Trier par date (plus récent en premier)
@@ -38,42 +39,42 @@ class PhotoRepository implements IPhotoRepository {
     
     // Sauvegarder
     final json = photos.map((p) => p.toJson()).toList();
-    print('[PhotoRepository] 📝 JSON created: ${json.length} items');
+    if (kDebugMode) debugPrint('[PhotoRepository] 📝 JSON created: ${json.length} items');
     
     await sp.setString(_storageKey, jsonEncode(json));
-    print('[PhotoRepository] ✅ Saved to SharedPreferences (key: $_storageKey)');
+    if (kDebugMode) debugPrint('[PhotoRepository] ✅ Saved to SharedPreferences (key: $_storageKey)');
     
     // Vérifier immédiatement la sauvegarde
     final savedData = sp.getString(_storageKey);
-    print('[PhotoRepository] 🔍 Verification: saved data length = ${savedData?.length ?? 0}');
+    if (kDebugMode) debugPrint('[PhotoRepository] 🔍 Verification: saved data length = ${savedData?.length ?? 0}');
   }
 
   @override
   Future<List<PhotoGalleryItem>> getAllPhotos() async {
-    print('[PhotoRepository] 🔵 getAllPhotos called');
+    if (kDebugMode) debugPrint('[PhotoRepository] 🔵 getAllPhotos called');
     final sp = await SharedPreferences.getInstance();
     final data = sp.getString(_storageKey);
     
     if (data == null) {
-      print('[PhotoRepository] ⚠️ No data in SharedPreferences (key: $_storageKey)');
+      if (kDebugMode) debugPrint('[PhotoRepository] ⚠️ No data in SharedPreferences (key: $_storageKey)');
       return [];
     }
     
-    print('[PhotoRepository] 📦 Raw data length: ${data.length}');
+    if (kDebugMode) debugPrint('[PhotoRepository] 📦 Raw data length: ${data.length}');
     
     try {
       final List<dynamic> jsonList = jsonDecode(data) as List<dynamic>;
-      print('[PhotoRepository] 📝 JSON decoded: ${jsonList.length} items');
+      if (kDebugMode) debugPrint('[PhotoRepository] 📝 JSON decoded: ${jsonList.length} items');
       
       final photos = jsonList
           .map((json) => PhotoGalleryItem.fromJson(json as Map<String, dynamic>))
           .toList();
       
-      print('[PhotoRepository] ✅ Returning ${photos.length} photos');
+      if (kDebugMode) debugPrint('[PhotoRepository] ✅ Returning ${photos.length} photos');
       return photos;
     } catch (e) {
       // Si erreur de parsing, retourner liste vide
-      print('[PhotoRepository] ❌ Error parsing JSON: $e');
+      if (kDebugMode) debugPrint('[PhotoRepository] ❌ Error parsing JSON: $e');
       return [];
     }
   }

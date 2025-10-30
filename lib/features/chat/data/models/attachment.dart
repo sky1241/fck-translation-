@@ -129,7 +129,7 @@ class AudioAttachmentDraft {
       kind: kind,
       sourcePath: sourcePath,
       mimeType: mimeType,
-      estimatedBytes: null,
+      estimatedBytes: null
     );
   }
 }

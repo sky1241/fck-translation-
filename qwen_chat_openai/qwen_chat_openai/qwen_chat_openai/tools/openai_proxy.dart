@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -13,13 +14,13 @@ Future<void> main() async {
     final int port = int.tryParse(Platform.environment['PORT'] ?? '') ?? 8787;
     final HttpServer server = await HttpServer.bind(InternetAddress.anyIPv4, port);
     // ignore: avoid_print
-    print('OpenAI proxy listening on http://0.0.0.0:$port');
+    if (kDebugMode) debugPrint('OpenAI proxy listening on http://0.0.0.0:$port');
     await for (HttpRequest req in server) {
       try {
         await _handle(req);
       } catch (e, st) {
         // ignore: avoid_print
-        print('proxy.handle.error: $e\n$st');
+        if (kDebugMode) debugPrint('proxy.handle.error: $e\n$st');
         try {
           req.response.statusCode = 502;
           req.response.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
@@ -30,7 +31,7 @@ Future<void> main() async {
     }
   }, (Object error, StackTrace st) {
     // ignore: avoid_print
-    print('proxy.fatal: $error\n$st');
+    if (kDebugMode) debugPrint('proxy.fatal: $error\n$st');
   });
 }
 

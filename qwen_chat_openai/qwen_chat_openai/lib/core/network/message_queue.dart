@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,7 +19,7 @@ class MessageQueue {
       final data = sp.getString(_storageKey);
       
       if (data == null) {
-        print('[MessageQueue] No pending messages');
+        if (kDebugMode) debugPrint('[MessageQueue] No pending messages');
         return;
       }
       
@@ -28,10 +29,10 @@ class MessageQueue {
         jsonList.map((json) => QueuedMessage.fromJson(json as Map<String, dynamic>))
       );
       
-      print('[MessageQueue] ✅ Loaded ${_queue.length} pending messages');
+      if (kDebugMode) debugPrint('[MessageQueue] ✅ Loaded ${_queue.length} pending messages');
       _queueSizeController.add(_queue.length);
     } catch (e) {
-      print('[MessageQueue] ❌ Error loading queue: $e');
+      if (kDebugMode) debugPrint('[MessageQueue] ❌ Error loading queue: $e');
     }
   }
 
@@ -48,11 +49,11 @@ class MessageQueue {
       
       _queue.add(qm);
       await _save();
-      print('[MessageQueue] ➕ Message queued (ID: $id, ${_queue.length} pending)');
+      if (kDebugMode) debugPrint('[MessageQueue] ➕ Message queued (ID: $id, ${_queue.length} pending)');
       _queueSizeController.add(_queue.length);
       return id;
     } catch (e) {
-      print('[MessageQueue] ❌ Error enqueueing: $e');
+      if (kDebugMode) debugPrint('[MessageQueue] ❌ Error enqueueing: $e');
       rethrow;
     }
   }
@@ -67,10 +68,10 @@ class MessageQueue {
     try {
       _queue.removeWhere((msg) => msg.id == id);
       await _save();
-      print('[MessageQueue] ✅ Message removed (${_queue.length} remaining)');
+      if (kDebugMode) debugPrint('[MessageQueue] ✅ Message removed (${_queue.length} remaining)');
       _queueSizeController.add(_queue.length);
     } catch (e) {
-      print('[MessageQueue] ❌ Error removing: $e');
+      if (kDebugMode) debugPrint('[MessageQueue] ❌ Error removing: $e');
     }
   }
 
@@ -85,7 +86,7 @@ class MessageQueue {
         await _save();
       }
     } catch (e) {
-      print('[MessageQueue] ❌ Error incrementing retry: $e');
+      if (kDebugMode) debugPrint('[MessageQueue] ❌ Error incrementing retry: $e');
     }
   }
 
@@ -96,7 +97,7 @@ class MessageQueue {
       final json = _queue.map((msg) => msg.toJson()).toList();
       await sp.setString(_storageKey, jsonEncode(json));
     } catch (e) {
-      print('[MessageQueue] ❌ Error saving: $e');
+      if (kDebugMode) debugPrint('[MessageQueue] ❌ Error saving: $e');
     }
   }
 

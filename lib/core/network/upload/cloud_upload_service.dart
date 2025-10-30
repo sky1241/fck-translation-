@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:image/image.dart' as img;
@@ -15,7 +17,7 @@ class CloudUploadService implements UploadService {
 
   @override
   Stream<UploadProgress> uploadAudio(AudioAttachmentDraft draft) async* {
-    print('[CloudUploadService] 🎤 Uploading audio file: ${draft.sourcePath}');
+    if (kDebugMode) debugPrint('[CloudUploadService] 🎤 Uploading audio file: ${draft.sourcePath}');
     yield UploadProgress(percent: 10);
     
     // For audio, fallback to base64 since audio files can be large
@@ -25,23 +27,23 @@ class CloudUploadService implements UploadService {
         final File file = File(draft.sourcePath);
         if (await file.exists()) {
           final Uint8List bytes = await file.readAsBytes();
-          print('[CloudUploadService] 🎤 Audio file size: ${bytes.length} bytes');
+          if (kDebugMode) debugPrint('[CloudUploadService] 🎤 Audio file size: ${bytes.length} bytes');
           
           // Check if file is small enough for base64 (e.g., < 500KB)
           if (bytes.length < 500 * 1024) {
-            print('[CloudUploadService] ✅ Converting audio to base64...');
+            if (kDebugMode) debugPrint('[CloudUploadService] ✅ Converting audio to base64...');
             final String b64 = 'data:audio/m4a;base64,${base64Encode(bytes)}';
             yield UploadProgress(percent: 100, base64Data: b64);
           } else {
-            print('[CloudUploadService] ❌ Audio file too large for base64');
+            if (kDebugMode) debugPrint('[CloudUploadService] ❌ Audio file too large for base64');
             yield UploadProgress(percent: 100);
           }
         } else {
-          print('[CloudUploadService] ❌ Audio file not found');
+          if (kDebugMode) debugPrint('[CloudUploadService] ❌ Audio file not found');
           yield UploadProgress(percent: 100);
         }
       } catch (e) {
-        print('[CloudUploadService] ❌ Error uploading audio: $e');
+        if (kDebugMode) debugPrint('[CloudUploadService] ❌ Error uploading audio: $e');
         yield UploadProgress(percent: 100);
       }
       return;
@@ -67,11 +69,11 @@ class CloudUploadService implements UploadService {
         final String url = _extractUrl(body) ?? '';
         yield UploadProgress(percent: 100, remoteUrl: url.isNotEmpty ? url : null);
       } else {
-        print('[CloudUploadService] ❌ Upload failed, no fallback for audio');
+        if (kDebugMode) debugPrint('[CloudUploadService] ❌ Upload failed, no fallback for audio');
         yield UploadProgress(percent: 100);
       }
     } catch (e) {
-      print('[CloudUploadService] ❌ Error during audio upload: $e');
+      if (kDebugMode) debugPrint('[CloudUploadService] ❌ Error during audio upload: $e');
       yield UploadProgress(percent: 100);
     }
   }
@@ -84,18 +86,18 @@ class CloudUploadService implements UploadService {
     if (endpointBase.isEmpty) {
       // No endpoint configured: embed small files as base64 and finish.
       try {
-        print('[CloudUploadService] 🔄 Converting image to JPEG format...');
+        if (kDebugMode) debugPrint('[CloudUploadService] 🔄 Converting image to JPEG format...');
         final Uint8List? convertedBytes = await _convertToJpeg(draft.sourcePath);
         if (convertedBytes != null && convertedBytes.length < 400 * 1024) {
-          print('[CloudUploadService] ✅ Converted to JPEG: ${convertedBytes.length} bytes');
+          if (kDebugMode) debugPrint('[CloudUploadService] ✅ Converted to JPEG: ${convertedBytes.length} bytes');
           final String b64 = 'data:image/jpeg;base64,${base64Encode(convertedBytes)}';
           yield UploadProgress(percent: 100, base64Data: b64);
         } else {
-          print('[CloudUploadService] ❌ Conversion failed or image too large');
+          if (kDebugMode) debugPrint('[CloudUploadService] ❌ Conversion failed or image too large');
           yield UploadProgress(percent: 100);
         }
       } catch (e) {
-        print('[CloudUploadService] ❌ Error: $e');
+        if (kDebugMode) debugPrint('[CloudUploadService] ❌ Error: $e');
         yield UploadProgress(percent: 100);
       }
       return;
@@ -118,16 +120,16 @@ class CloudUploadService implements UploadService {
     } else {
       // Upload failed: fallback to base64
       try {
-        print('[CloudUploadService] ⚠️ Upload failed, fallback to base64...');
+        if (kDebugMode) debugPrint('[CloudUploadService] ⚠️ Upload failed, fallback to base64...');
         final Uint8List? convertedBytes = await _convertToJpeg(draft.sourcePath);
         if (convertedBytes != null && convertedBytes.length < 400 * 1024) {
-          print('[CloudUploadService] ✅ Fallback: Converted to JPEG: ${convertedBytes.length} bytes');
+          if (kDebugMode) debugPrint('[CloudUploadService] ✅ Fallback: Converted to JPEG: ${convertedBytes.length} bytes');
           final String b64 = 'data:image/jpeg;base64,${base64Encode(convertedBytes)}';
           yield UploadProgress(percent: 100, base64Data: b64);
           return;
         }
       } catch (e) {
-        print('[CloudUploadService] ❌ Fallback error: $e');
+        if (kDebugMode) debugPrint('[CloudUploadService] ❌ Fallback error: $e');
       }
       yield UploadProgress(percent: 100);
     }
@@ -150,24 +152,24 @@ class CloudUploadService implements UploadService {
       final File file = File(filePath);
       final Uint8List bytes = await file.readAsBytes();
       
-      print('[CloudUploadService] 🔍 Original image size: ${bytes.length} bytes');
+      if (kDebugMode) debugPrint('[CloudUploadService] 🔍 Original image size: ${bytes.length} bytes');
       
       // Decode image using `image` package (supports JPEG, PNG, GIF, BMP, TIFF, TGA, PSD, PVR, etc.)
       final img.Image? image = img.decodeImage(bytes);
       if (image == null) {
-        print('[CloudUploadService] ❌ Failed to decode image');
+        if (kDebugMode) debugPrint('[CloudUploadService] ❌ Failed to decode image');
         return null;
       }
       
-      print('[CloudUploadService] 🔍 Image decoded: ${image.width}x${image.height}');
+      if (kDebugMode) debugPrint('[CloudUploadService] 🔍 Image decoded: ${image.width}x${image.height}');
       
       // Re-encode as JPEG with quality 60 (smaller size for WebSocket compatibility)
       final List<int> jpegBytes = img.encodeJpg(image, quality: 60);
-      print('[CloudUploadService] 🔍 JPEG encoded: ${jpegBytes.length} bytes');
+      if (kDebugMode) debugPrint('[CloudUploadService] 🔍 JPEG encoded: ${jpegBytes.length} bytes');
       
       return Uint8List.fromList(jpegBytes);
     } catch (e) {
-      print('[CloudUploadService] ❌ Failed to convert image: $e');
+      if (kDebugMode) debugPrint('[CloudUploadService] ❌ Failed to convert image: $e');
       return null;
     }
   }

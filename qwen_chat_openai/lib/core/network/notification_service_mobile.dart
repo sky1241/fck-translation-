@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'badge_service.dart';
 
 class NotificationService {
@@ -31,9 +32,9 @@ class NotificationService {
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(channel);
       
-      print('[NotificationService] ✅ Channel created: unread_messages_v4 (sound enabled)');
+      if (kDebugMode) debugPrint('[NotificationService] ✅ Channel created: unread_messages_v4 (sound enabled)');
     } catch (e) {
-      print('[NotificationService] ❌ Error initializing: $e');
+      if (kDebugMode) debugPrint('[NotificationService] ❌ Error initializing: $e');
       // Swallow initialization errors to avoid blocking app startup
     }
   }
@@ -72,15 +73,15 @@ class NotificationService {
       // Note: showSilently() requires flutter_local_notifications >= 18.0.0
       // For now, we use show() with onlyAlertOnce for silent mode
       if (silent) {
-        print('[NotificationService] 🔇 Showing notification (silent mode - update only)');
+        if (kDebugMode) debugPrint('[NotificationService] 🔇 Showing notification (silent mode - update only)');
       } else {
-        print('[NotificationService] 🔔 Showing notification WITH SOUND (count: $count)');
+        if (kDebugMode) debugPrint('[NotificationService] 🔔 Showing notification WITH SOUND (count: $count)');
       }
       
       // Always show with show() (silent mode is achieved by using onlyAlertOnce which doesn't re-alert)
       await _fln.show(_summaryNotificationId, summaryTitle, 'Ouvrez XiaoXin002', summaryDetails);
     } catch (e) {
-      print('[NotificationService] ❌ Error showing summary notification: $e');
+      if (kDebugMode) debugPrint('[NotificationService] ❌ Error showing summary notification: $e');
     }
   }
 
