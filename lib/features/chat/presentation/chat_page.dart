@@ -164,7 +164,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             hintText: controller.sourceLang == 'fr'
                 ? 'Écrire en français…'
                 : '用中文输入…',
-            onPickAttachment: null, // Désactivé - microphon uniquement
+            // onPickAttachment désactivé - microphone uniquement
             onRecordVoice: () async {
               final notifier = ref.read(chatControllerProvider.notifier);
               if (notifier.isRecordingVoice) {

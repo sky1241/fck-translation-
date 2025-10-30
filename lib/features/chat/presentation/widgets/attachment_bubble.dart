@@ -64,7 +64,6 @@ class AttachmentBubble extends StatelessWidget {
               : url != null
                   ? Base64ImageWidget(
                       imageSource: url,
-                      fit: BoxFit.cover,
                     )
                   : Container(
                       color: Colors.black12,

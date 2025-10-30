@@ -22,7 +22,6 @@ class PhotoGrid extends StatelessWidget {
         crossAxisCount: 3,
         crossAxisSpacing: 4,
         mainAxisSpacing: 4,
-        childAspectRatio: 1,
       ),
       itemCount: photos.length,
       itemBuilder: (context, index) {

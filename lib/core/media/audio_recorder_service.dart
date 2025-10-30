@@ -51,11 +51,7 @@ class AudioRecorderService {
       
       // Démarrer l'enregistrement avec le plugin record (nouvelle API v6)
       await _recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 128000,
-          sampleRate: 44100,
-        ),
+        const RecordConfig(),
         path: _currentPath!,
       );
       

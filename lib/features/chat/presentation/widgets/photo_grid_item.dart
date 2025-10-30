@@ -87,7 +87,6 @@ class PhotoGridItem extends StatelessWidget {
     
     return Base64ImageWidget(
       imageSource: imageUrl,
-      fit: BoxFit.cover,
     );
   }
 

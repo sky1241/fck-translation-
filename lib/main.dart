@@ -35,5 +35,5 @@ Future<void> main() async {
   final container = ProviderContainer();
   BadgeService.setContainer(container);
   
-  runApp(ProviderScope(child: const App()));
+  runApp(const ProviderScope(child: App()));
 }

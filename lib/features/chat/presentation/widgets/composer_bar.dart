@@ -51,7 +51,7 @@ class ComposerBar extends StatelessWidget {
                   width: 50,
                   height: 50,
                   alignment: Alignment.center,
-                  child: Icon(
+                  child: const Icon(
                     Icons.mic,
                     color: Colors.white,
                     size: 28,

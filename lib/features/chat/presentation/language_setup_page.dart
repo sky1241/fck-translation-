@@ -22,7 +22,7 @@ class LanguageSetupPage extends ConsumerWidget {
     ref.read(chatControllerProvider.notifier).setDirection(source, target);
     if (context.mounted) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute<Widget>(builder: (_) => ChatPage()),
+        MaterialPageRoute<Widget>(builder: (_) => const ChatPage()),
       );
     }
   }

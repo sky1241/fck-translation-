@@ -291,8 +291,6 @@ class ChatController extends Notifier<List<ChatMessage>> {
         translatedText: '', // Pas de traduction pour ton propre message
         isMe: true, // TON message
         time: DateTime.now().toUtc(),
-        pinyin: null,
-        notes: null,
       );
       state = <ChatMessage>[...state, myMsg];
       ref.notifyListeners();

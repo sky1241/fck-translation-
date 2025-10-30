@@ -22,10 +22,6 @@ class NotificationService {
         'Messages non lus',
         description: 'Notifications des messages non lus avec son',
         importance: Importance.max, // MAX importance for sound + popup
-        playSound: true,
-        enableVibration: true,
-        showBadge: true,
-        enableLights: true,
       );
       
       await _fln

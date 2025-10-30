@@ -65,12 +65,12 @@ class PhotoGalleryController extends Notifier<PhotoGalleryState> {
   /// Charger toutes les photos
   Future<void> loadPhotos() async {
     if (kDebugMode) debugPrint('[PhotoGalleryController] 🔵 loadPhotos called');
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true);
 
     try {
       final photos = await _photoRepository.getAllPhotos();
       final count = photos.length;
-      if (kDebugMode) debugPrint('[PhotoGalleryController] 📸 Loaded ${count} photos from repository');
+      if (kDebugMode) debugPrint('[PhotoGalleryController] 📸 Loaded $count photos from repository');
       
       final cacheBytes = await _cacheService.getCacheSize();
       final cacheSize = _cacheService.formatCacheSize(cacheBytes);
@@ -82,7 +82,7 @@ class PhotoGalleryController extends Notifier<PhotoGalleryState> {
         isLoading: false,
       );
       
-      if (kDebugMode) debugPrint('[PhotoGalleryController] ✅ State updated with ${count} photos');
+      if (kDebugMode) debugPrint('[PhotoGalleryController] ✅ State updated with $count photos');
     } catch (e) {
       if (kDebugMode) debugPrint('[PhotoGalleryController] ❌ Error loading photos: $e');
       state = state.copyWith(

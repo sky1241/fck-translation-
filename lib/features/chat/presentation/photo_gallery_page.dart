@@ -54,9 +54,10 @@ class _PhotoGalleryPageState extends ConsumerState<PhotoGalleryPage> {
               if (value == 'delete_all') {
                 _showDeleteAllDialog();
               } else if (value == 'clear_cache') {
-                await controller.clearOldCache(daysToKeep: 30);
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                await controller.clearOldCache();
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessenger.showSnackBar(
                     const SnackBar(content: Text('Cache nettoyé')),
                   );
                 }
@@ -334,11 +335,12 @@ class _PhotoGalleryPageState extends ConsumerState<PhotoGalleryPage> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
               await ref
                   .read(photoGalleryControllerProvider.notifier)
                   .deleteAllPhotos();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                scaffoldMessenger.showSnackBar(
                   const SnackBar(content: Text('Toutes les photos supprimées')),
                 );
               }
