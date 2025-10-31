@@ -15,9 +15,7 @@ jobs:
           channel: 'stable'
       - name: Flutter pub get
         run: flutter pub get
-        working-directory: qwen_chat_openai
       - name: Flutter analyze
         run: flutter analyze
-        working-directory: qwen_chat_openai
 
 
