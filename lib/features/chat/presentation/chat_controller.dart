@@ -81,8 +81,9 @@ class ChatController extends Notifier<List<ChatMessage>> {
           final String? text = msg['text'] as String?;
           final String? srcLang = msg['source_lang'] as String?;
           final String? tgtLang = msg['target_lang'] as String?;
+          final String? msgId = msg['id'] as String?;
           if (text == null) return;
-          _receiveRemote(text, sourceLang: srcLang, targetLang: tgtLang);
+          _receiveRemote(text, sourceLang: srcLang, targetLang: tgtLang, msgId: msgId);
           // Increment badge FIRST (before notification that might fail)
           unawaited(BadgeService.increment());
           // Notification locale simple (foreground) - may fail, but badge already updated
@@ -261,32 +262,22 @@ class ChatController extends Notifier<List<ChatMessage>> {
       return;
     }
     
-    // DÉTECTION AUTOMATIQUE DE LANGUE
-    final String detectedLang = _detectLanguage(text);
+    // UTILISER LA CONFIGURATION DE L'APP (pas de détection auto qui change tout)
+    // APK 001 : defaultDirection=fr2zh → _sourceLang='fr', _targetLang='zh'
+    // APK 002 : defaultDirection=zh2fr → _sourceLang='zh', _targetLang='fr'
+    // Ces valeurs sont définies dans build() et NE DOIVENT PAS CHANGER
     
-    // Définir automatiquement source et target
-    if (detectedLang == 'zh') {
-      _sourceLang = 'zh';
-      _targetLang = 'fr';
-    } else {
-      _sourceLang = 'fr';
-      _targetLang = 'zh';
-    }
-    
-    if (!(_sourceLang == 'fr' && _targetLang == 'zh') &&
-        !(_sourceLang == 'zh' && _targetLang == 'fr')) {
-      _lastError = 'Langues supportées: FR ⇄ ZH uniquement.';
-      ref.notifyListeners();
-      return;
-    }
     _isSending = true;
     _lastError = null;
     ref.notifyListeners();
 
     try {
-      // 1. Créer TON message original (ce que TU vois dans TA langue)
+      // Créer un ID unique pour ce message
+      final String msgId = DateTime.now().microsecondsSinceEpoch.toString();
+      
+      // 1. Créer TON message original (ce que TU vois dans TA langue - pas de traduction)
       final ChatMessage myMsg = ChatMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: msgId,
         originalText: text,
         translatedText: '', // Pas de traduction pour ton propre message
         isMe: true, // TON message
@@ -295,10 +286,11 @@ class ChatController extends Notifier<List<ChatMessage>> {
       state = <ChatMessage>[...state, myMsg];
       ref.notifyListeners();
       
-      // 2. Broadcast to relay so the counterpart client receives it
+      // 2. Broadcast to relay so the counterpart client receives it (avec ID pour éviter duplication)
       if (broadcast && _rt != null && _rt!.enabled) {
         unawaited(_rt!.send(<String, Object?>{
           'type': 'text',
+          'id': msgId, // ID pour éviter les duplications
           'text': text,
           'source_lang': _sourceLang,
           'target_lang': _targetLang,
@@ -353,15 +345,27 @@ class ChatController extends Notifier<List<ChatMessage>> {
     return 'fr';
   }
 
-  Future<void> _receiveRemote(String text, {String? sourceLang, String? targetLang}) async {
-    // Use the metadata from the sender if available, otherwise fall back to assumptions
-    final String src = sourceLang ?? _targetLang;
-    final String target = targetLang ?? _sourceLang;
+  Future<void> _receiveRemote(String text, {String? sourceLang, String? targetLang, String? msgId}) async {
+    // Vérifier si on a déjà ce message (éviter duplication)
+    if (msgId != null) {
+      final bool exists = state.any((m) => m.id == msgId);
+      if (exists) {
+        // C'est notre propre message qui revient en boucle, on l'ignore
+        return;
+      }
+    }
     
-    // If the message is already in our language, display it without translation
-    if (target == _sourceLang) {
+    // Utiliser les métadonnées du sender si disponibles
+    final String src = sourceLang ?? (text.contains(RegExp(r'[\u4e00-\u9fff]')) ? 'zh' : 'fr');
+    // TOUJOURS traduire vers notre langue source (ce qu'on veut voir)
+    // APK 001 (_sourceLang='fr') reçoit ZH → traduit en FR
+    // APK 002 (_sourceLang='zh') reçoit FR → traduit en ZH
+    final String target = _sourceLang;
+    
+    // Si le message est déjà dans notre langue, on l'affiche tel quel
+    if (src == _sourceLang) {
       final ChatMessage replyMsg = ChatMessage(
-        id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+        id: msgId ?? (DateTime.now().microsecondsSinceEpoch + 1).toString(),
         originalText: text,
         translatedText: text,
         isMe: false,
@@ -373,20 +377,20 @@ class ChatController extends Notifier<List<ChatMessage>> {
       return;
     }
     
-    // Otherwise, translate the message
+    // Sinon, traduire le message vers notre langue
     try {
       final TranslationResult res = await _repo.translate(
         text: text,
         sourceLang: src,
-        targetLang: _sourceLang,
+        targetLang: target, // TOUJOURS vers _sourceLang
         tone: _tone,
-        wantPinyin: _sourceLang == 'zh' ? _wantPinyin : false,
+        wantPinyin: target == 'zh' ? _wantPinyin : false,
       );
 
       final ChatMessage replyMsg = ChatMessage(
-        id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+        id: msgId ?? (DateTime.now().microsecondsSinceEpoch + 1).toString(),
         originalText: text, // Le texte original reçu (dans la langue de l'autre)
-        translatedText: res.translation, // La traduction dans TA langue
+        translatedText: res.translation, // La traduction dans NOTRE langue
         isMe: false,
         time: DateTime.now().toUtc(),
         pinyin: res.pinyin,
@@ -421,8 +425,9 @@ class ChatController extends Notifier<List<ChatMessage>> {
         final String? text = msg['text'] as String?;
         final String? srcLang = msg['source_lang'] as String?;
         final String? tgtLang = msg['target_lang'] as String?;
+        final String? msgId = msg['id'] as String?;
         if (text == null) return;
-        _receiveRemote(text, sourceLang: srcLang, targetLang: tgtLang);
+        _receiveRemote(text, sourceLang: srcLang, targetLang: tgtLang, msgId: msgId);
         unawaited(BadgeService.increment());
         try {
           _notif.showIncomingMessage(
