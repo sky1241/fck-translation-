@@ -33,7 +33,8 @@ class RealtimeService {
 
   Future<void> connect() async {
     if (!enabled) return;
-    if (_channel != null) return;
+    // Permettre la reconnexion même si _channel existe déjà
+    if (_channel != null && _isConnected) return;
     final String effectiveUrl = _url.isNotEmpty
         ? _url
         : AppEnv.relayWsUrl;

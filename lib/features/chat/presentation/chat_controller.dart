@@ -403,11 +403,75 @@ class ChatController extends Notifier<List<ChatMessage>> {
 
   /// Reconnecter le service realtime
   void reconnect() {
-    if (_rt != null && AppEnv.relayRoom.isNotEmpty) {
-      _rt!.disconnect();
-      _rt = RealtimeService(url: AppEnv.relayWsUrl, room: AppEnv.relayRoom);
-      _rt!.connect();
-    }
+    if (AppEnv.relayRoom.isEmpty) return;
+    
+    // Nettoyer l'ancienne connexion
+    _rt?.disconnect();
+    _rt?.dispose();
+    _rt = null;
+    
+    // Créer et connecter un nouveau service
+    _rt = RealtimeService(url: AppEnv.relayWsUrl, room: AppEnv.relayRoom);
+    _rt!.connect();
+    
+    // Réécouter les messages
+    _rt!.messages.listen((Map<String, dynamic> msg) {
+      final String? kind = msg['type'] as String?;
+      if (kind == 'text') {
+        final String? text = msg['text'] as String?;
+        final String? srcLang = msg['source_lang'] as String?;
+        final String? tgtLang = msg['target_lang'] as String?;
+        if (text == null) return;
+        _receiveRemote(text, sourceLang: srcLang, targetLang: tgtLang);
+        unawaited(BadgeService.increment());
+        try {
+          _notif.showIncomingMessage(
+            title: _sourceLang == 'fr' ? 'Nouveau message (ZH→FR)' : '新消息 (FR→ZH)',
+            body: text,
+            silent: _silentMode,
+          );
+        } catch (_) {}
+      } else if (kind == 'attachment') {
+        final String? url = msg['url'] as String?;
+        final String? id = msg['id'] as String?;
+        final String? mime = msg['mime'] as String?;
+        final String? k = msg['kind'] as String?;
+        if (url == null || id == null || mime == null || k == null) return;
+        final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
+        final Attachment att = Attachment(
+          id: id,
+          kind: kindAtt,
+          mimeType: mime,
+          remoteUrl: url,
+          createdAt: DateTime.now().toUtc(),
+          status: AttachmentStatus.uploaded,
+        );
+        final ChatMessage m = ChatMessage(
+          id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+          originalText: '',
+          translatedText: '',
+          isMe: false,
+          time: DateTime.now().toUtc(),
+          attachments: <Attachment>[att],
+        );
+        state = <ChatMessage>[...state, m];
+        saveMessages();
+        ref.notifyListeners();
+        unawaited(BadgeService.increment());
+        try {
+          _notif.showIncomingMessage(
+            title: _sourceLang == 'fr' ? 'Pièce jointe reçue' : '收到附件',
+            body: mime,
+            silent: _silentMode,
+          );
+        } catch (_) {}
+      }
+    });
+    
+    // Écouter le statut de connexion pour notifier l'UI
+    _rt!.connectionStatus.listen((bool connected) {
+      ref.notifyListeners();
+    });
   }
 
   /// Démarrer l'enregistrement vocal
