@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +19,9 @@ import '../../../core/media/audio_recorder_service.dart';
 import '../data/models/attachment.dart';
 import '../../../core/network/upload/cloud_upload_service.dart';
 import '../../../core/network/upload/upload_service.dart';
+import '../data/photo_repository.dart';
+import '../data/models/photo_gallery_item.dart';
+import '../domain/i_photo_repository.dart';
 
 final IChatRepository _defaultRepo = ChatRepository();
 
@@ -44,6 +49,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
   final AttachmentPickerService _picker = AttachmentPickerService();
   final AudioRecorderService _audioRecorder = AudioRecorderService();
   late final UploadService _uploader = CloudUploadService(endpointBase: AppEnv.uploadBaseUrl);
+  late final IPhotoRepository _photoRepo = PhotoRepository();
 
   String get sourceLang => _sourceLang;
   String get targetLang => _targetLang;
@@ -106,28 +112,47 @@ class ChatController extends Notifier<List<ChatMessage>> {
           if (id == null || mime == null || k == null) return;
           if (url == null && base64Data == null) return; // Besoin d'au moins url ou base64
           
-          final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
-          // Utiliser base64 comme URL si pas d'URL disponible
-          final String effectiveUrl = url ?? (base64Data != null ? base64Data : '');
-          final Attachment att = Attachment(
-            id: id,
-            kind: kindAtt,
-            mimeType: mime,
-            remoteUrl: effectiveUrl, // Peut être une URL ou du base64
-            createdAt: DateTime.now().toUtc(),
-            status: AttachmentStatus.uploaded,
-          );
-          final ChatMessage m = ChatMessage(
-            id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
-            originalText: '',
-            translatedText: '',
-            isMe: false,
-            time: DateTime.now().toUtc(),
-            attachments: <Attachment>[att],
-          );
-          state = <ChatMessage>[...state, m];
-          saveMessages();
-          ref.notifyListeners();
+        final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
+        // Utiliser base64 comme URL si pas d'URL disponible
+        final String effectiveUrl = url ?? (base64Data != null ? base64Data : '');
+        final Attachment att = Attachment(
+          id: id,
+          kind: kindAtt,
+          mimeType: mime,
+          remoteUrl: effectiveUrl, // Peut être une URL ou du base64
+          createdAt: DateTime.now().toUtc(),
+          status: AttachmentStatus.uploaded,
+        );
+        final ChatMessage m = ChatMessage(
+          id: (DateTime.now().microsecondsSinceEpoch + 1).toString(),
+          originalText: '',
+          translatedText: '',
+          isMe: false,
+          time: DateTime.now().toUtc(),
+          attachments: <Attachment>[att],
+        );
+        state = <ChatMessage>[...state, m];
+        
+        // Sauvegarder la photo dans la galerie si c'est une image (en async pour ne pas bloquer)
+        if (kindAtt == AttachmentKind.image) {
+          unawaited(() async {
+            try {
+              final photoItem = PhotoGalleryItem(
+                id: id,
+                url: effectiveUrl,
+                timestamp: DateTime.now().toUtc(),
+                isFromMe: false,
+              );
+              await _photoRepo.savePhoto(photoItem);
+              if (kDebugMode) debugPrint('[ChatController] ✅ Photo reçue sauvegardée dans galerie: $id');
+            } catch (e) {
+              if (kDebugMode) debugPrint('[ChatController] ⚠️ Erreur sauvegarde photo reçue: $e');
+            }
+          }());
+        }
+        
+        saveMessages();
+        ref.notifyListeners();
           // Increment badge FIRST
           unawaited(BadgeService.increment());
           // Notification - may fail, but badge already updated
@@ -341,14 +366,6 @@ class ChatController extends Notifier<List<ChatMessage>> {
     ref.notifyListeners();
   }
 
-  String _detectLanguage(String text) {
-    // Détecte si le texte contient des caractères chinois
-    final RegExp chineseRegex = RegExp(r'[\u4e00-\u9fff]');
-    if (chineseRegex.hasMatch(text)) {
-      return 'zh';
-    }
-    return 'fr';
-  }
 
   Future<void> _receiveRemote(String text, {String? sourceLang, String? targetLang, String? msgId}) async {
     // Vérifier si on a déjà ce message (éviter duplication)
@@ -471,6 +488,25 @@ class ChatController extends Notifier<List<ChatMessage>> {
           attachments: <Attachment>[att],
         );
         state = <ChatMessage>[...state, m];
+        
+        // Sauvegarder la photo dans la galerie si c'est une image (en async pour ne pas bloquer)
+        if (kindAtt == AttachmentKind.image) {
+          unawaited(() async {
+            try {
+              final photoItem = PhotoGalleryItem(
+                id: id,
+                url: effectiveUrl,
+                timestamp: DateTime.now().toUtc(),
+                isFromMe: false,
+              );
+              await _photoRepo.savePhoto(photoItem);
+              if (kDebugMode) debugPrint('[ChatController] ✅ Photo reçue sauvegardée dans galerie: $id');
+            } catch (e) {
+              if (kDebugMode) debugPrint('[ChatController] ⚠️ Erreur sauvegarde photo reçue: $e');
+            }
+          }());
+        }
+        
         saveMessages();
         ref.notifyListeners();
         unawaited(BadgeService.increment());
@@ -497,13 +533,28 @@ class ChatController extends Notifier<List<ChatMessage>> {
 
   /// Arrêter l'enregistrement vocal et envoyer
   Future<void> stopRecordingVoice() async {
-    final path = await _audioRecorder.stopRecording();
-    if (path != null) {
-      // Envoyer le fichier audio comme pièce jointe
-      final AttachmentDraft? draft = await _picker.pickFile(path);
-      if (draft != null) {
-        await _sendAttachmentDraft(draft);
+    if (!_audioRecorder.isRecording) return;
+    
+    try {
+      final path = await _audioRecorder.stopRecording();
+      if (path != null && path.isNotEmpty) {
+        // Créer directement un AttachmentDraft depuis le fichier audio (sans pickFile qui peut freeze)
+        final file = File(path);
+        if (await file.exists()) {
+          final size = await file.length();
+          final draft = AttachmentDraft(
+            kind: AttachmentKind.audio,
+            sourcePath: path,
+            mimeType: 'audio/m4a',
+            estimatedBytes: size,
+          );
+          await _sendAttachmentDraft(draft);
+        }
       }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ChatController] ❌ Error stopping voice recording: $e');
+      _lastError = 'Erreur lors de l\'envoi de l\'audio';
+      ref.notifyListeners();
     }
   }
 
@@ -540,15 +591,38 @@ class ChatController extends Notifier<List<ChatMessage>> {
       state = updated;
       ref.notifyListeners();
 
-      if (p.remoteUrl != null && _rt != null && _rt!.enabled) {
-        unawaited(_rt!.send(<String, Object?>{
-          'type': 'attachment',
-          'id': attId,
-          'kind': draft.kind.name,
-          'mime': draft.mimeType,
-          'url': p.remoteUrl,
-          'ts': DateTime.now().toUtc().toIso8601String(),
-        }));
+      if (p.remoteUrl != null || p.base64Data != null) {
+        // Sauvegarder la photo dans la galerie si c'est une image (en async pour ne pas bloquer)
+        if (draft.kind == AttachmentKind.image) {
+          unawaited(() async {
+            try {
+              final photoItem = PhotoGalleryItem(
+                id: attId,
+                url: p.remoteUrl ?? (p.base64Data != null ? 'data:${draft.mimeType};base64,${p.base64Data}' : ''),
+                localPath: draft.sourcePath,
+                timestamp: DateTime.now().toUtc(),
+                isFromMe: true,
+              );
+              await _photoRepo.savePhoto(photoItem);
+              if (kDebugMode) debugPrint('[ChatController] ✅ Photo sauvegardée dans galerie: $attId');
+            } catch (e) {
+              if (kDebugMode) debugPrint('[ChatController] ⚠️ Erreur sauvegarde photo galerie: $e');
+            }
+          }());
+        }
+        
+        // Broadcast via relay
+        if (_rt != null && _rt!.enabled) {
+          unawaited(_rt!.send(<String, Object?>{
+            'type': 'attachment',
+            'id': attId,
+            'kind': draft.kind.name,
+            'mime': draft.mimeType,
+            if (p.remoteUrl != null) 'url': p.remoteUrl,
+            if (p.base64Data != null) 'base64': p.base64Data,
+            'ts': DateTime.now().toUtc().toIso8601String(),
+          }));
+        }
         await saveMessages();
       }
     });
