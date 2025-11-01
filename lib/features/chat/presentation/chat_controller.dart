@@ -114,7 +114,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
           
         final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
         // Utiliser base64 comme URL si pas d'URL disponible
-        final String effectiveUrl = url ?? (base64Data != null ? base64Data : '');
+        final String effectiveUrl = url ?? base64Data ?? '';
         final Attachment att = Attachment(
           id: id,
           kind: kindAtt,
@@ -470,7 +470,7 @@ class ChatController extends Notifier<List<ChatMessage>> {
         
         final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
         // Utiliser base64 comme URL si pas d'URL disponible
-        final String effectiveUrl = url ?? (base64Data != null ? base64Data : '');
+        final String effectiveUrl = url ?? base64Data ?? '';
         final Attachment att = Attachment(
           id: id,
           kind: kindAtt,
