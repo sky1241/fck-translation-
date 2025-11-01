@@ -98,17 +98,22 @@ class ChatController extends Notifier<List<ChatMessage>> {
           }
         } else if (kind == 'attachment') {
           final String? url = msg['url'] as String?;
+          final String? base64Data = msg['base64'] as String?;
           final String? id = msg['id'] as String?;
           final String? mime = msg['mime'] as String?;
           final String? k = msg['kind'] as String?; // image|video
-          // Base64 relay is supported but optional; we ignore it client-side here
-          if (url == null || id == null || mime == null || k == null) return;
+          // Il faut au moins un ID, mime, kind ET (url OU base64)
+          if (id == null || mime == null || k == null) return;
+          if (url == null && base64Data == null) return; // Besoin d'au moins url ou base64
+          
           final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
+          // Utiliser base64 comme URL si pas d'URL disponible
+          final String effectiveUrl = url ?? (base64Data != null ? base64Data : '');
           final Attachment att = Attachment(
             id: id,
             kind: kindAtt,
             mimeType: mime,
-            remoteUrl: url,
+            remoteUrl: effectiveUrl, // Peut être une URL ou du base64
             createdAt: DateTime.now().toUtc(),
             status: AttachmentStatus.uploaded,
           );
@@ -438,16 +443,22 @@ class ChatController extends Notifier<List<ChatMessage>> {
         } catch (_) {}
       } else if (kind == 'attachment') {
         final String? url = msg['url'] as String?;
+        final String? base64Data = msg['base64'] as String?;
         final String? id = msg['id'] as String?;
         final String? mime = msg['mime'] as String?;
         final String? k = msg['kind'] as String?;
-        if (url == null || id == null || mime == null || k == null) return;
+        // Il faut au moins un ID, mime, kind ET (url OU base64)
+        if (id == null || mime == null || k == null) return;
+        if (url == null && base64Data == null) return; // Besoin d'au moins url ou base64
+        
         final AttachmentKind kindAtt = (k == 'video') ? AttachmentKind.video : AttachmentKind.image;
+        // Utiliser base64 comme URL si pas d'URL disponible
+        final String effectiveUrl = url ?? (base64Data != null ? base64Data : '');
         final Attachment att = Attachment(
           id: id,
           kind: kindAtt,
           mimeType: mime,
-          remoteUrl: url,
+          remoteUrl: effectiveUrl, // Peut être une URL ou du base64
           createdAt: DateTime.now().toUtc(),
           status: AttachmentStatus.uploaded,
         );
