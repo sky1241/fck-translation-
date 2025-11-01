@@ -1,4 +1,4 @@
-package com.example.qwen_chat_openai
+package com.xiaoxin.xiaoxin002
 
 import android.content.Context
 import io.flutter.embedding.engine.plugins.FlutterPlugin
